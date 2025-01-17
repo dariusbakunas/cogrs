@@ -17,11 +17,11 @@ pub fn load_inventory(inventory: &PathBuf) -> HashMap<String, HostGroup> {
     hosts
 }
 
-pub fn filter_hosts(hosts: &HashMap<String, HostGroup>, pattern: &str) -> Vec<String> {
+pub fn filter_hosts(inventory: &HashMap<String, HostGroup>, pattern: &str) -> Vec<String> {
     let mut filtered_hosts: HashSet<String> = HashSet::new();
 
     if pattern == "all" {
-        for (_, value) in hosts.into_iter() {
+        for (_, value) in inventory.into_iter() {
             match &value.hosts {
                 Some(h) => {
                     filtered_hosts.extend(h.keys().cloned());
@@ -34,7 +34,7 @@ pub fn filter_hosts(hosts: &HashMap<String, HostGroup>, pattern: &str) -> Vec<St
             .split([':', ',']) // Split by ':' or ','
             .collect();
 
-        for (group_name, value) in hosts.into_iter() {
+        for (group_name, value) in inventory.into_iter() {
             if patterns.contains(&group_name.as_str()) {
                 match &value.hosts {
                     Some(h) => {
