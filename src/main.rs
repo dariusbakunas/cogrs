@@ -29,7 +29,7 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Show AutoRS inventory information
+    /// Show CogRS inventory information
     Inventory {
         /// specify inventory host path
         #[arg(short, long, value_name = "FILE")]
