@@ -1,10 +1,12 @@
 mod cli;
 mod inventory;
 mod modules;
-mod shell;
+mod playbook;
+mod ssh;
 
 use crate::inventory::{filter_hosts, load_inventory};
 use crate::modules::handle_module_execution;
+use crate::playbook::load_playbook;
 use anyhow::Result;
 use clap::Parser;
 use cli::Cli;
@@ -43,7 +45,8 @@ async fn main() -> Result<()> {
             handle_module_execution(module, &cli, hosts).await;
         } else if let Some(playbook) = &cli.playbook {
             // TODO
-            unimplemented!();
+            let playbook = load_playbook(playbook);
+            println!("{:?}", playbook);
         } else {
             error!(
                 "either a module or a playbook must be specified, use --help for more information"

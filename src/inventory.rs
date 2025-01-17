@@ -10,11 +10,11 @@ pub struct HostGroup {
 #[derive(Debug, Serialize, Deserialize)]
 struct Host {}
 
-pub fn load_inventory(inventory: &PathBuf) -> HashMap<String, HostGroup> {
-    let f = std::fs::File::open(inventory).expect("Could not open inventory file.");
-    let hosts: HashMap<String, HostGroup> =
+pub fn load_inventory(path: &PathBuf) -> HashMap<String, HostGroup> {
+    let f = std::fs::File::open(path).expect("Could not open inventory file.");
+    let inventory: HashMap<String, HostGroup> =
         serde_yaml::from_reader(f).expect("Could not read inventory file.");
-    hosts
+    inventory
 }
 
 pub fn filter_hosts(inventory: &HashMap<String, HostGroup>, pattern: &str) -> Vec<String> {

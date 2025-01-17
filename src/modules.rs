@@ -1,5 +1,5 @@
 use crate::cli::Cli;
-use crate::shell::execute_on_host;
+use crate::ssh::execute_on_host;
 use log::{error, warn};
 
 pub async fn handle_module_execution(module: &str, cli: &Cli, hosts: Option<Vec<String>>) {
