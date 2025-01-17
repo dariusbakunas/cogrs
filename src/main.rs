@@ -1,9 +1,10 @@
+mod inventory;
+
 use std::collections::HashMap;
-use std::iter::Map;
 use std::path::PathBuf;
 use clap::{Parser, Subcommand};
-use serde::{Deserialize, Serialize};
 use serde_yaml::{self};
+use crate::inventory::{filter_hosts, load_inventory, HostGroup};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -36,63 +37,14 @@ enum Commands {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct HostGroup {
-    hosts: Option<HashMap<String, Host>>
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Host {
-}
-
 fn main() {
     let cli = Cli::parse();
 
     if cli.list_hosts {
         match cli.inventory {
             Some(inventory) => {
-                let f = std::fs::File::open(inventory).expect("Could not open inventory file.");
-                let deser: HashMap<String, HostGroup> = serde_yaml::from_reader(f).expect("Could not read inventory file.");
-
-                let mut hosts: Vec<String> = Vec::new();
-
-                if cli.pattern == "all" {
-                    for (_, value) in deser.into_iter() {
-                        match value.hosts {
-                            Some(h) => {
-                                hosts.extend(h.keys().cloned());
-                            }
-                            None => {}
-                        }
-                    }
-                } else {
-                    let patterns: Vec<&str> = cli.pattern
-                        .split([':', ',']) // Split by ':' or ','
-                        .collect();
-
-                    for (group_name, value) in deser.into_iter() {
-                        if patterns.contains(&group_name.as_str()) {
-                            match &value.hosts {
-                                Some(h) => {
-                                    hosts.extend(h.keys().cloned());
-                                }
-                                None => {}
-                            }
-                        } else {
-                            match &value.hosts {
-                                Some(h) => {
-                                    hosts.extend(
-                                        h.keys()
-                                            .filter(|key| patterns.contains(&key.as_str()))
-                                            .cloned()
-                                    );
-                                }
-                                None => {}
-                            }
-                        }
-                    }
-
-                }
+                let deser = load_inventory(&inventory);
+                let hosts = filter_hosts(&deser, &cli.pattern);
 
                 for host in hosts {
                     println!("{}", host);
