@@ -1,8 +1,8 @@
-use anyhow::{Result};
+use anyhow::Result;
 
 pub async fn execute_on_host(host: &str, args: &str) -> Result<()> {
-    use openssh::{Session, KnownHosts};
     use log::info;
+    use openssh::{KnownHosts, Session};
 
     info!("executing on host: {}", host);
     let session = Session::connect_mux(format!("ssh://{}:22", host), KnownHosts::Strict).await?;

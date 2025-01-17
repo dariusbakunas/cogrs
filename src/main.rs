@@ -1,15 +1,15 @@
 mod inventory;
 mod shell;
 
-use log::{debug, error, info, log_enabled, warn, Level};
-use std::collections::HashMap;
-use std::path::PathBuf;
-use clap::{Parser, Subcommand};
-use openssh::{KnownHosts, Session};
-use serde_yaml::{self};
-use anyhow::{Result};
 use crate::inventory::{filter_hosts, load_inventory, HostGroup};
 use crate::shell::execute_on_host;
+use anyhow::Result;
+use clap::{Parser, Subcommand};
+use log::{debug, error, info, log_enabled, warn, Level};
+use openssh::{KnownHosts, Session};
+use serde_yaml::{self};
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -37,7 +37,7 @@ struct Cli {
     inventory: Option<PathBuf>,
 
     #[command(subcommand)]
-    cmd: Option<Commands>
+    cmd: Option<Commands>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -46,8 +46,8 @@ enum Commands {
     Inventory {
         /// specify inventory host path
         #[arg(short, long, value_name = "FILE")]
-        inventory: PathBuf
-    }
+        inventory: PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -75,7 +75,7 @@ async fn main() -> Result<()> {
                 for host in hosts {
                     println!("{}", host);
                 }
-            },
+            }
             None => {}
         }
     } else {
@@ -88,7 +88,7 @@ async fn main() -> Result<()> {
                             error!("failed to execute on host '{}': {}", host, e);
                         }
                     }
-                },
+                }
                 None => {
                     // TODO
                     let mut cmd = std::process::Command::new("bash");
@@ -98,7 +98,6 @@ async fn main() -> Result<()> {
                     print!("{}", String::from_utf8_lossy(&out.stdout));
                 }
             }
-
         } else {
             warn!("module '{}' not implemented", cli.module_name);
         }
@@ -107,7 +106,8 @@ async fn main() -> Result<()> {
     match &cli.cmd {
         Some(Commands::Inventory { inventory }) => {
             let f = std::fs::File::open(inventory).expect("Could not open inventory file.");
-            let deser: HashMap<String, HostGroup> = serde_yaml::from_reader(f).expect("Could not read inventory file.");
+            let deser: HashMap<String, HostGroup> =
+                serde_yaml::from_reader(f).expect("Could not read inventory file.");
             println!("{:#?}", deser);
         }
         None => {}

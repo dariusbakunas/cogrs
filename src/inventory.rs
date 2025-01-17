@@ -1,19 +1,19 @@
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HostGroup {
-    hosts: Option<HashMap<String, Host>>
+    hosts: Option<HashMap<String, Host>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Host {
-}
+struct Host {}
 
 pub fn load_inventory(inventory: &PathBuf) -> HashMap<String, HostGroup> {
     let f = std::fs::File::open(inventory).expect("Could not open inventory file.");
-    let hosts: HashMap<String, HostGroup> = serde_yaml::from_reader(f).expect("Could not read inventory file.");
+    let hosts: HashMap<String, HostGroup> =
+        serde_yaml::from_reader(f).expect("Could not read inventory file.");
     hosts
 }
 
@@ -48,7 +48,7 @@ pub fn filter_hosts(inventory: &HashMap<String, HostGroup>, pattern: &str) -> Ve
                         filtered_hosts.extend(
                             h.keys()
                                 .filter(|key| patterns.contains(&key.as_str()))
-                                .cloned()
+                                .cloned(),
                         );
                     }
                     None => {}
@@ -73,7 +73,8 @@ mod tests {
             None
         } else {
             Some(
-                hosts.into_iter()
+                hosts
+                    .into_iter()
                     .map(|host| (host.to_string(), Host {}))
                     .collect(),
             )
@@ -115,10 +116,7 @@ mod tests {
         );
 
         let result = filter_hosts(&hosts, "group1");
-        let expected: Vec<String> = ["host1", "host2"]
-            .into_iter()
-            .map(String::from)
-            .collect();
+        let expected: Vec<String> = ["host1", "host2"].into_iter().map(String::from).collect();
 
         assert_eq!(result, expected);
     }
@@ -168,13 +166,13 @@ mod tests {
             create_host_group(vec!["host1", "host2"]),
         );
         hosts.insert("group2".to_string(), create_host_group(vec!["host3"]));
-        hosts.insert("group3".to_string(), create_host_group(vec!["host4", "host5"]));
+        hosts.insert(
+            "group3".to_string(),
+            create_host_group(vec!["host4", "host5"]),
+        );
 
         let result = filter_hosts(&hosts, "group2,host5");
-        let expected: Vec<String> = ["host3", "host5"]
-            .into_iter()
-            .map(String::from)
-            .collect();
+        let expected: Vec<String> = ["host3", "host5"].into_iter().map(String::from).collect();
 
         assert_eq!(result, expected);
     }
