@@ -46,10 +46,7 @@ fn main() {
                 let deser = load_inventory(&inventory);
                 let hosts = filter_hosts(&deser, &cli.pattern);
 
-                let mut sorted_hosts: Vec<String> = hosts.into_iter().collect();
-                sorted_hosts.sort();
-
-                for host in sorted_hosts {
+                for host in hosts {
                     println!("{}", host);
                 }
             }

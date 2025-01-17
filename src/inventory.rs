@@ -17,7 +17,7 @@ pub fn load_inventory(inventory: &PathBuf) -> HashMap<String, HostGroup> {
     hosts
 }
 
-pub fn filter_hosts(hosts: &HashMap<String, HostGroup>, pattern: &str) -> HashSet<String> {
+pub fn filter_hosts(hosts: &HashMap<String, HostGroup>, pattern: &str) -> Vec<String> {
     let mut filtered_hosts: HashSet<String> = HashSet::new();
 
     if pattern == "all" {
@@ -57,7 +57,9 @@ pub fn filter_hosts(hosts: &HashMap<String, HostGroup>, pattern: &str) -> HashSe
         }
     }
 
-    filtered_hosts
+    let mut sorted_hosts: Vec<String> = filtered_hosts.into_iter().collect();
+    sorted_hosts.sort();
+    sorted_hosts
 }
 
 #[cfg(test)]
@@ -92,7 +94,7 @@ mod tests {
         );
 
         let result = filter_hosts(&hosts, "all");
-        let expected: HashSet<String> = ["host1", "host2", "host3", "host4"]
+        let expected: Vec<String> = ["host1", "host2", "host3", "host4"]
             .into_iter()
             .map(String::from)
             .collect();
@@ -113,7 +115,7 @@ mod tests {
         );
 
         let result = filter_hosts(&hosts, "group1");
-        let expected: HashSet<String> = ["host1", "host2"]
+        let expected: Vec<String> = ["host1", "host2"]
             .into_iter()
             .map(String::from)
             .collect();
@@ -132,7 +134,7 @@ mod tests {
         hosts.insert("group3".to_string(), create_host_group(vec!["host4"]));
 
         let result = filter_hosts(&hosts, "group1,group3");
-        let expected: HashSet<String> = ["host1", "host2", "host4"]
+        let expected: Vec<String> = ["host1", "host2", "host4"]
             .into_iter()
             .map(String::from)
             .collect();
@@ -153,7 +155,7 @@ mod tests {
         );
 
         let result = filter_hosts(&hosts, "host3");
-        let expected: HashSet<String> = ["host3"].into_iter().map(String::from).collect();
+        let expected: Vec<String> = ["host3"].into_iter().map(String::from).collect();
 
         assert_eq!(result, expected);
     }
@@ -169,7 +171,7 @@ mod tests {
         hosts.insert("group3".to_string(), create_host_group(vec!["host4", "host5"]));
 
         let result = filter_hosts(&hosts, "group2,host5");
-        let expected: HashSet<String> = ["host3", "host5"]
+        let expected: Vec<String> = ["host3", "host5"]
             .into_iter()
             .map(String::from)
             .collect();
@@ -184,7 +186,7 @@ mod tests {
         hosts.insert("group2".to_string(), create_host_group(vec![]));
 
         let result = filter_hosts(&hosts, "all");
-        let expected: HashSet<String> = HashSet::new();
+        let expected: Vec<String> = Vec::new();
 
         assert_eq!(result, expected);
     }
@@ -202,7 +204,7 @@ mod tests {
         );
 
         let result = filter_hosts(&hosts, "");
-        let expected: HashSet<String> = HashSet::new();
+        let expected: Vec<String> = Vec::new();
 
         assert_eq!(result, expected);
     }
@@ -220,7 +222,7 @@ mod tests {
         );
 
         let result = filter_hosts(&hosts, "group3");
-        let expected: HashSet<String> = HashSet::new();
+        let expected: Vec<String> = Vec::new();
 
         assert_eq!(result, expected);
     }
