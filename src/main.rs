@@ -1,4 +1,5 @@
 mod inventory;
+mod shell;
 
 use log::{debug, error, info, log_enabled, warn, Level};
 use std::collections::HashMap;
@@ -8,6 +9,7 @@ use openssh::{KnownHosts, Session};
 use serde_yaml::{self};
 use anyhow::{Result};
 use crate::inventory::{filter_hosts, load_inventory, HostGroup};
+use crate::shell::execute_on_host;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -82,20 +84,9 @@ async fn main() -> Result<()> {
             match hosts {
                 Some(hosts) => {
                     for host in &hosts {
-                        info!("executing on host: {}", host);
-                        let session = Session::connect_mux(format!("ssh://{}:22", host), KnownHosts::Strict)
-                            .await?;
-
-                        let mut cmd = session.command("bash");
-                        cmd.arg("-c");
-                        cmd.arg(&args);
-
-                        let output = cmd.output().await.unwrap();
-                        eprintln!(
-                            "{}",
-                            String::from_utf8(output.stdout).expect("server output was not valid UTF-8")
-                        );
-                        session.close().await.unwrap();
+                        if let Err(e) = execute_on_host(host, args.as_str()).await {
+                            error!("failed to execute on host '{}': {}", host, e);
+                        }
                     }
                 },
                 None => {
