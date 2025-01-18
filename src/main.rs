@@ -51,7 +51,6 @@ async fn main() -> Result<()> {
         if let Some(module) = &cli.module_name {
             handle_module_execution(module, &cli, hosts).await;
         } else if let Some(playbook) = &cli.playbook {
-            // TODO
             let playbook = load_playbook(playbook);
             println!("{:?}", playbook);
         } else {

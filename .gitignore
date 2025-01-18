@@ -132,4 +132,8 @@ target/
 
 *.profraw
 .devbox
+
+# used for local integration testing for now
+testing/
+
 # End of https://www.toptal.com/developers/gitignore/api/intellij+all,osx,rust

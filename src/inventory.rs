@@ -5,11 +5,9 @@ use anyhow::Result;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HostGroup {
-    hosts: Option<HashMap<String, Host>>,
+    hosts: Option<HashMap<String, serde_yaml::Value>>,
+    vars: Option<HashMap<String, serde_yaml::Value>>
 }
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Host {}
 
 pub fn load_inventory<R: Read>(reader: R) -> Result<HashMap<String, HostGroup>> {
     let inventory: HashMap<String, HostGroup> =
@@ -67,6 +65,7 @@ mod tests {
     use super::*;
     use std::collections::{HashMap};
     use std::io::Cursor;
+    use serde_yaml::Value::Null;
 
     // Helper function to create a HostGroup with optional hosts
     fn create_host_group(hosts: Vec<&str>) -> HostGroup {
@@ -76,11 +75,11 @@ mod tests {
             Some(
                 hosts
                     .into_iter()
-                    .map(|host| (host.to_string(), Host {}))
+                    .map(|host| (host.to_string(), Null))
                     .collect(),
             )
         };
-        HostGroup { hosts: hosts_map }
+        HostGroup { hosts: hosts_map, vars: None }
     }
 
     #[test]
