@@ -239,13 +239,9 @@ mod tests {
             host3: {}
         "#;
 
-        // Use a Cursor (in-memory stream) as the reader
         let reader = Cursor::new(yaml_data);
-
-        // Call the function
         let result = load_inventory(reader);
 
-        // Verify the result
         assert!(result.is_ok());
         let inventory = result.unwrap();
         assert!(inventory.contains_key("group1"));
@@ -274,16 +270,11 @@ mod tests {
 
     #[test]
     fn test_load_inventory_empty_data() {
-        // Prepare an empty YAML file
         let empty_yaml = "";
 
-        // Use a Cursor for the reader
         let reader = Cursor::new(empty_yaml);
-
-        // Call the function
         let result = load_inventory(reader);
 
-        // Verify the result
         assert!(result.is_ok());
         let inventory = result.unwrap();
         assert!(inventory.is_empty());
@@ -291,34 +282,25 @@ mod tests {
 
     #[test]
     fn test_load_inventory_invalid_yaml() {
-        // Prepare invalid YAML data
         let invalid_yaml = r#"
         group1:
           hosts: { invalid_yaml
         "#;
 
-        // Use a Cursor for the reader
-        let reader = Cursor::new(invalid_yaml);
 
-        // Call the function
+        let reader = Cursor::new(invalid_yaml);
         let result = load_inventory(reader);
 
-        // Verify the result
         assert!(result.is_err());
     }
 
     #[test]
     fn test_load_inventory_non_yaml_data() {
-        // Prepare non-YAML data
         let non_yaml_data = "This is not YAML!";
 
-        // Use a Cursor for the reader
         let reader = Cursor::new(non_yaml_data);
-
-        // Call the function
         let result = load_inventory(reader);
 
-        // Verify the result
         assert!(result.is_err());
     }
 }
