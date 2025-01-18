@@ -2,11 +2,39 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::io::Read;
 use anyhow::Result;
+use serde_yaml::Value;
+
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HostGroup {
-    hosts: Option<HashMap<String, serde_yaml::Value>>,
-    vars: Option<HashMap<String, serde_yaml::Value>>
+    hosts: Option<HashMap<String, Value>>,
+    vars: Option<HashMap<String, Value>>
+}
+
+pub fn merge_yaml_values(a: &mut Value, b: Value) {
+    if b.is_null() {
+        return;
+    }
+    match (a, b) {
+        (Value::Mapping(ref mut map_a), Value::Mapping(map_b)) => {
+            for (key, value_b) in map_b {
+                match map_a.get_mut(&key) {
+                    Some(value_a) => {
+                        // Recursively merge if both values are mappings
+                        merge_yaml_values(value_a, value_b);
+                    }
+                    None => {
+                        // Insert if the key doesn't exist in map_a
+                        map_a.insert(key, value_b);
+                    }
+                }
+            }
+        }
+        // If `a` is not a mapping or they are different types, replace `a` entirely with `b`
+        (a_val, b_val) => {
+            *a_val = b_val;
+        }
+    }
 }
 
 pub fn load_inventory<R: Read>(reader: R) -> Result<HashMap<String, HostGroup>> {
@@ -306,5 +334,236 @@ mod tests {
         let result = load_inventory(reader);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_merge_different_keys() {
+        let mut a: Value = serde_yaml::from_str(
+            r#"
+            key1: value1
+            key2:
+              subkey1: subvalue1
+            "#
+        )
+            .unwrap();
+
+        let b: Value = serde_yaml::from_str(
+            r#"
+            key3: value3
+            key4:
+              subkey2: subvalue2
+            "#
+        )
+            .unwrap();
+
+        merge_yaml_values(&mut a, b);
+
+        let expected: Value = serde_yaml::from_str(
+            r#"
+            key1: value1
+            key2:
+              subkey1: subvalue1
+            key3: value3
+            key4:
+              subkey2: subvalue2
+            "#
+        )
+            .unwrap();
+
+        assert_eq!(a, expected);
+    }
+
+    #[test]
+    fn test_merge_overwrite_primitive() {
+        let mut a: Value = serde_yaml::from_str(
+            r#"
+            key1: value1
+            key2: value2
+            "#
+        )
+            .unwrap();
+
+        let b: Value = serde_yaml::from_str(
+            r#"
+            key2: new_value2
+            key3: value3
+            "#
+        )
+            .unwrap();
+
+        merge_yaml_values(&mut a, b);
+
+        let expected: Value = serde_yaml::from_str(
+            r#"
+            key1: value1
+            key2: new_value2
+            key3: value3
+            "#
+        )
+            .unwrap();
+
+        assert_eq!(a, expected);
+    }
+
+    #[test]
+    fn test_merge_nested_objects() {
+        let mut a: Value = serde_yaml::from_str(
+            r#"
+            key1:
+              subkey1: value1
+              subkey2: value2
+            key2: outer_value
+            "#
+        )
+            .unwrap();
+
+        let b: Value = serde_yaml::from_str(
+            r#"
+            key1:
+              subkey2: new_value2
+              subkey3: value3
+            "#
+        )
+            .unwrap();
+
+        merge_yaml_values(&mut a, b);
+
+        let expected: Value = serde_yaml::from_str(
+            r#"
+            key1:
+              subkey1: value1
+              subkey2: new_value2
+              subkey3: value3
+            key2: outer_value
+            "#
+        )
+            .unwrap();
+
+        assert_eq!(a, expected);
+    }
+
+    #[test]
+    fn test_merge_overwrite_non_mapping() {
+        let mut a: Value = serde_yaml::from_str(
+            r#"
+            key1: value1
+            key2: value2
+            key3: non_object_value
+            "#
+        )
+            .unwrap();
+
+        let b: Value = serde_yaml::from_str(
+            r#"
+            key3:
+              subkey: subvalue
+            key4: value4
+            "#
+        )
+            .unwrap();
+
+        merge_yaml_values(&mut a, b);
+
+        let expected: Value = serde_yaml::from_str(
+            r#"
+            key1: value1
+            key2: value2
+            key3:
+              subkey: subvalue
+            key4: value4
+            "#
+        )
+            .unwrap();
+
+        assert_eq!(a, expected);
+    }
+
+    #[test]
+    fn test_merge_empty_b() {
+        let mut a: Value = serde_yaml::from_str(
+            r#"
+            key1:
+              subkey1: value1
+            key2: value2
+            "#
+        )
+            .unwrap();
+
+        let b: Value = serde_yaml::from_str("").unwrap(); // Empty
+
+        merge_yaml_values(&mut a, b);
+
+        let expected: Value = serde_yaml::from_str(
+            r#"
+            key1:
+              subkey1: value1
+            key2: value2
+            "#
+        )
+            .unwrap();
+
+        assert_eq!(a, expected);
+    }
+
+    #[test]
+    fn test_merge_empty_a() {
+        let mut a: Value = serde_yaml::from_str("").unwrap(); // Empty
+
+        let b: Value = serde_yaml::from_str(
+            r#"
+            key1:
+              subkey1: value1
+            key2: value2
+            "#
+        )
+            .unwrap();
+
+        merge_yaml_values(&mut a, b);
+
+        let expected: Value = serde_yaml::from_str(
+            r#"
+            key1:
+              subkey1: value1
+            key2: value2
+            "#
+        )
+            .unwrap();
+
+        assert_eq!(a, expected);
+    }
+
+    #[test]
+    fn test_merge_conflicting_types() {
+        let mut a: Value = serde_yaml::from_str(
+            r#"
+            key1:
+              subkey1: value1
+            key2:
+              subkey2: value2
+            "#
+        )
+            .unwrap();
+
+        let b: Value = serde_yaml::from_str(
+            r#"
+            key2: new_value2
+            key3: value3
+            "#
+        )
+            .unwrap();
+
+        merge_yaml_values(&mut a, b);
+
+        let expected: Value = serde_yaml::from_str(
+            r#"
+            key1:
+              subkey1: value1
+            key2: new_value2
+            key3: value3
+            "#
+        )
+            .unwrap();
+
+        assert_eq!(a, expected);
     }
 }
