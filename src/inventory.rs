@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::io::Read;
+use anyhow::Result;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HostGroup {
@@ -10,11 +11,10 @@ pub struct HostGroup {
 #[derive(Debug, Serialize, Deserialize)]
 struct Host {}
 
-pub fn load_inventory(path: &PathBuf) -> HashMap<String, HostGroup> {
-    let f = std::fs::File::open(path).expect("Could not open inventory file.");
+pub fn load_inventory<R: Read>(reader: R) -> Result<HashMap<String, HostGroup>> {
     let inventory: HashMap<String, HostGroup> =
-        serde_yaml::from_reader(f).expect("Could not read inventory file.");
-    inventory
+        serde_yaml::from_reader(reader)?;
+    Ok(inventory)
 }
 
 pub fn filter_hosts(inventory: &HashMap<String, HostGroup>, pattern: &str) -> Vec<String> {
@@ -65,7 +65,8 @@ pub fn filter_hosts(inventory: &HashMap<String, HostGroup>, pattern: &str) -> Ve
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::{HashMap, HashSet};
+    use std::collections::{HashMap};
+    use std::io::Cursor;
 
     // Helper function to create a HostGroup with optional hosts
     fn create_host_group(hosts: Vec<&str>) -> HostGroup {
@@ -223,5 +224,101 @@ mod tests {
         let expected: Vec<String> = Vec::new();
 
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn test_load_inventory_valid_data() {
+        // Prepare valid YAML inventory data
+        let yaml_data = r#"
+        group1:
+          hosts:
+            host1: {}
+            host2: {}
+        group2:
+          hosts:
+            host3: {}
+        "#;
+
+        // Use a Cursor (in-memory stream) as the reader
+        let reader = Cursor::new(yaml_data);
+
+        // Call the function
+        let result = load_inventory(reader);
+
+        // Verify the result
+        assert!(result.is_ok());
+        let inventory = result.unwrap();
+        assert!(inventory.contains_key("group1"));
+        assert!(inventory.contains_key("group2"));
+
+        let mut group1_hosts = inventory["group1"]
+            .hosts
+            .as_ref()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<Vec<String>>();
+
+        group1_hosts.sort();
+        assert_eq!(group1_hosts, vec!["host1", "host2"]);
+
+        let group2_hosts = inventory["group2"]
+            .hosts
+            .as_ref()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<Vec<String>>();
+        assert_eq!(group2_hosts, vec!["host3"]);
+    }
+
+    #[test]
+    fn test_load_inventory_empty_data() {
+        // Prepare an empty YAML file
+        let empty_yaml = "";
+
+        // Use a Cursor for the reader
+        let reader = Cursor::new(empty_yaml);
+
+        // Call the function
+        let result = load_inventory(reader);
+
+        // Verify the result
+        assert!(result.is_ok());
+        let inventory = result.unwrap();
+        assert!(inventory.is_empty());
+    }
+
+    #[test]
+    fn test_load_inventory_invalid_yaml() {
+        // Prepare invalid YAML data
+        let invalid_yaml = r#"
+        group1:
+          hosts: { invalid_yaml
+        "#;
+
+        // Use a Cursor for the reader
+        let reader = Cursor::new(invalid_yaml);
+
+        // Call the function
+        let result = load_inventory(reader);
+
+        // Verify the result
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_inventory_non_yaml_data() {
+        // Prepare non-YAML data
+        let non_yaml_data = "This is not YAML!";
+
+        // Use a Cursor for the reader
+        let reader = Cursor::new(non_yaml_data);
+
+        // Call the function
+        let result = load_inventory(reader);
+
+        // Verify the result
+        assert!(result.is_err());
     }
 }

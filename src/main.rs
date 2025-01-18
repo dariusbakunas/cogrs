@@ -23,8 +23,15 @@ async fn main() -> Result<()> {
 
     match cli.inventory {
         Some(ref inventory) => {
-            let inventory = load_inventory(&inventory);
-            hosts = Some(filter_hosts(&inventory, &cli.pattern));
+            let f = std::fs::File::open(inventory).expect("Could not open inventory file.");
+            match load_inventory(f) {
+                Ok(inventory) => {
+                    hosts = Some(filter_hosts(&inventory, &cli.pattern));
+                }
+                Err(e) => {
+                    error!("Could not read inventory file: {}", e);
+                }
+            }
         }
         None => {
             warn!("no inventory was parsed, only implicit localhost is available");
