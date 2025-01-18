@@ -231,11 +231,16 @@ mod tests {
         let yaml_data = r#"
         group1:
           hosts:
-            host1: {}
+            host1:
+                ssh_user: test
+                ssh_port: 2222
             host2: {}
         group2:
+          vars:
+            ssh_user: ubuntu
           hosts:
-            host3: {}
+            host3:
+                ssh_port: 1234
         "#;
 
         let reader = Cursor::new(yaml_data);
