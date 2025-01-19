@@ -2,6 +2,7 @@ mod group;
 mod host;
 pub mod manager;
 mod utils;
+mod yml;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
