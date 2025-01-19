@@ -1,3 +1,8 @@
+pub mod manager;
+mod utils;
+mod group;
+mod host;
+
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::io::Read;
@@ -10,6 +15,10 @@ pub struct HostGroup {
     hosts: Option<HashMap<String, Value>>,
     vars: Option<HashMap<String, Value>>
 }
+
+pub struct DataLoader {}
+
+struct VariableManager {}
 
 pub fn merge_yaml_values(a: &mut Value, b: Value) {
     if b.is_null() {

@@ -170,6 +170,7 @@ dependencies = [
  "env_logger",
  "log",
  "openssh",
+ "regex",
  "rstest",
  "serde",
  "serde_yaml",

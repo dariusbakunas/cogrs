@@ -77,13 +77,13 @@ mod tests {
 
     #[test]
     fn test_numeric_pattern_with_prefix_and_suffix() {
-        let pattern = "prefix[0:5]suffix";
+        let pattern = "prefix[0:5].suffix";
         let expected = vec![
-            "prefix0suffix",
-            "prefix1suffix",
-            "prefix2suffix",
-            "prefix3suffix",
-            "prefix4suffix",
+            "prefix0.suffix",
+            "prefix1.suffix",
+            "prefix2.suffix",
+            "prefix3.suffix",
+            "prefix4.suffix",
         ];
         let result = parse_host_pattern(pattern).unwrap();
         assert_eq!(result, expected);

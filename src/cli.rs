@@ -23,8 +23,8 @@ pub struct Cli {
     pub pattern: String,
 
     /// specify inventory host path
-    #[arg(short, long, value_name = "FILE")]
-    pub inventory: Option<PathBuf>,
+    #[arg(short, long)]
+    pub inventory: Option<Vec<String>>,
 
     /// specify playbook you want to run
     #[arg(short, long, value_name = "FILE", group = "action")]

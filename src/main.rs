@@ -4,13 +4,10 @@ mod modules;
 mod playbook;
 mod ssh;
 
-use crate::inventory::{filter_hosts, load_inventory};
-use crate::modules::handle_module_execution;
-use crate::playbook::load_playbook;
+
 use anyhow::Result;
 use clap::Parser;
 use cli::Cli;
-use log::{error, warn};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -19,46 +16,5 @@ async fn main() -> Result<()> {
     );
 
     let cli = Cli::parse();
-    let mut hosts: Option<Vec<String>> = None;
-
-    match cli.inventory {
-        Some(ref inventory) => {
-            let f = std::fs::File::open(inventory).expect("Could not open inventory file.");
-            match load_inventory(f) {
-                Ok(inventory) => {
-                    hosts = Some(filter_hosts(&inventory, &cli.pattern));
-                }
-                Err(e) => {
-                    error!("Could not read inventory file: {}", e);
-                }
-            }
-        }
-        None => {
-            warn!("no inventory was parsed, only implicit localhost is available");
-        }
-    }
-
-    if cli.list_hosts {
-        match hosts {
-            Some(hosts) => {
-                for host in hosts {
-                    println!("{}", host);
-                }
-            }
-            None => {}
-        }
-    } else {
-        if let Some(module) = &cli.module_name {
-            handle_module_execution(module, &cli, hosts).await;
-        } else if let Some(playbook) = &cli.playbook {
-            let playbook = load_playbook(playbook);
-            println!("{:?}", playbook);
-        } else {
-            error!(
-                "either a module or a playbook must be specified, use --help for more information"
-            )
-        }
-    }
-
-    Ok(())
+    cogrs::run(cli.inventory.as_ref())
 }
