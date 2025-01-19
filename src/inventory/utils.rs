@@ -132,6 +132,5 @@ mod tests {
         let pattern = "host[0:3]-region[a:c]";
         let result = parse_host_pattern(pattern);
         assert!(result.is_err(), "Multiple patterns are not currently supported");
-        // Note: This test assumes multiple patterns in the same string are unsupported.
     }
 }
