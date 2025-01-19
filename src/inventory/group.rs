@@ -2,7 +2,7 @@ use serde_yaml::Value;
 use std::collections::HashMap;
 
 pub struct Group {
-    name: String,
+    pub name: String,
     vars: HashMap<String, Value>,
     hosts: Vec<String>,
     child_groups: Option<Vec<Group>>,

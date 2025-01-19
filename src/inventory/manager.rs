@@ -27,6 +27,90 @@ pub struct InventoryManager {
     hosts: HashMap<String, Host>,
 }
 
+fn parse_group(
+    group_name: &str,
+    data: &serde_yaml::Mapping,
+    groups: &mut HashMap<String, Group>,
+    hosts: &mut HashMap<String, Host>,
+) -> Result<()> {
+    debug!("Parsing {group_name} group");
+
+    // Stack to hold groups for processing
+    let mut group_stack = vec![(group_name.to_string(), data.clone())];
+
+    while let Some((current_group_name, current_data)) = group_stack.pop() {
+        let group = groups
+            .entry(current_group_name.clone())
+            .or_insert(Group::new(&current_group_name));
+
+        for (key, val) in &current_data {
+            if let Value::String(key) = key {
+                match key.as_str() {
+                    "vars" => {
+                        // TODO: parse vars
+                        info!("Parsing vars in group: {current_group_name}");
+                    }
+                    "hosts" => {
+                        if let Value::Mapping(val) = val {
+                            for (host_key, host_val) in val {
+                                if let Value::String(host_pattern) = host_key {
+                                    let new_hosts = parse_host_pattern(host_pattern)?;
+                                    for host_name in new_hosts {
+                                        let host = hosts
+                                            .entry(host_name.to_string())
+                                            .or_insert(Host::new(&host_name));
+                                        group.add_host(&host.name);
+                                    }
+                                }
+                            }
+                        } else {
+                            error!(
+                                "YAML group has invalid structure, hosts should be a dictionary, got: {}",
+                                get_value_type(&val)
+                            );
+                        }
+                    }
+                    "children" => {
+                        if let Value::Mapping(val) = val {
+                            for (child_key, child_val) in val {
+                                if let Value::String(child_group_name) = child_key {
+                                    if let Value::Mapping(child_data) = child_val {
+                                        // Push child group onto the stack for processing
+                                        info!("Queueing child group: {child_group_name}");
+                                        group_stack.push((
+                                            child_group_name.to_string(),
+                                            child_data.clone(),
+                                        ));
+                                    } else if let Value::Null = child_val {
+                                        // Child group has no vars or hosts listed
+                                        info!("Queueing empty child group: {child_group_name}");
+                                        group_stack.push((
+                                            child_group_name.to_string(),
+                                            serde_yaml::Mapping::new(),
+                                        ));
+                                    } else {
+                                        error!(
+                                            "YAML group has invalid structure, children should be dictionaries, got: {}",
+                                            get_value_type(&child_val)
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    &_ => {
+                        warn!(
+                            "Skipping unexpected key \"{key}\" in group \"{current_group_name}\", only \"vars\", \"children\" and \"hosts\" are valid"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 impl InventoryManager {
     pub fn new() -> Self {
         InventoryManager {
@@ -49,63 +133,6 @@ impl InventoryManager {
         }
 
         Ok(())
-    }
-
-    fn parse_group(&mut self, group_name: &str, data: &serde_yaml::Mapping) -> Result<&Group> {
-        debug!("Parsing {group_name} group");
-        let group = self
-            .groups
-            .entry(group_name.to_string())
-            .or_insert(Group::new(group_name));
-
-        for (key, val) in data {
-            if let Value::String(key) = key {
-                match key.as_str() {
-                    "vars" => {
-                        info!("parsing vars");
-                    }
-                    "hosts" => {
-                        if let Value::Mapping(val) = val {
-                            for (key, val) in val {
-                                if let Value::String(host_pattern) = key {
-                                    let hosts = parse_host_pattern(host_pattern)?;
-                                    for host_name in hosts {
-                                        let host = self
-                                            .hosts
-                                            .entry(host_name.to_string())
-                                            .or_insert(Host::new(&host_name));
-                                        group.add_host(&host.name);
-                                    }
-                                }
-                            }
-                        } else {
-                            error!("YAML group has invalid structure, hosts should be a dictionary, got: {}", get_value_type(&val))
-                        }
-                    }
-                    "children" => {
-                        if let Value::Mapping(val) = val {
-                            for (key, val) in val {
-                                if let Value::String(group_name) = key {
-                                    if let Value::Mapping(val) = val {
-                                        info!("TODO: parse child group {group_name}")
-                                    } else if let Value::Null = val {
-                                        // child group has no vars or hosts listed
-                                        info!("TODO: parse empty child group {group_name}")
-                                    } else {
-                                        error!("YAML group has invalid structure, it should be a dictionary, got: {}", get_value_type(&val))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    &_ => {
-                        warn!("Skipping unexpected key \"{key}\" in group \"{group_name}\", only \"vars\", \"children\" and \"hosts\" are valid");
-                    }
-                }
-            }
-        }
-
-        Ok(group)
     }
 
     fn parse_source(&mut self, source: &str) -> Result<()> {
@@ -183,7 +210,9 @@ impl InventoryManager {
                 for (key, val) in groups {
                     if let Value::String(group_name) = key {
                         if let Value::Mapping(group_data) = val {
-                            self.parse_group(&group_name, &group_data)?;
+                            let groups = &mut self.groups;
+                            let hosts = &mut self.hosts;
+                            parse_group(&group_name, &group_data, groups, hosts)?;
                         } else {
                             error!(
                             "YAML group has invalid structure, it should be a dictionary, got: {}",
