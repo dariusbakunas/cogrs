@@ -23,7 +23,7 @@ pub fn parse_host_pattern(pattern: &str) -> anyhow::Result<Vec<String>> {
         // Determine if the range is numeric or alphabetic
         if let (Ok(start_num), Ok(end_num)) = (start.parse::<usize>(), end.parse::<usize>()) {
             // Generate numeric range values with the given stride
-            for i in (start_num..end_num).step_by(stride) {
+            for i in (start_num..=end_num).step_by(stride) {
                 // Replace the full pattern in the original string with the current value
                 let generated_host = pattern.replace(full_match, &i.to_string());
                 hosts.push(generated_host);
@@ -35,7 +35,7 @@ pub fn parse_host_pattern(pattern: &str) -> anyhow::Result<Vec<String>> {
                 // Generate alphabetic range values with the given stride
                 let mut current = start_char as u32;
 
-                while current < end_char as u32 {
+                while current <= end_char as u32 {
                     if let Some(current_char) = char::from_u32(current) {
                         // Replace the full pattern in the original string with the current character
                         let generated_host = pattern.replace(full_match, &current_char.to_string());
@@ -65,7 +65,7 @@ mod tests {
     #[test]
     fn test_numeric_pattern_suffix() {
         let pattern = "host[0:5]";
-        let expected = vec!["host0", "host1", "host2", "host3", "host4"];
+        let expected = vec!["host0", "host1", "host2", "host3", "host4", "host5"];
         let result = parse_host_pattern(pattern).unwrap();
         assert_eq!(result, expected);
     }
@@ -73,7 +73,7 @@ mod tests {
     #[test]
     fn test_numeric_pattern_with_stride() {
         let pattern = "host[0:10:2]";
-        let expected = vec!["host0", "host2", "host4", "host6", "host8"];
+        let expected = vec!["host0", "host2", "host4", "host6", "host8", "host10"];
         let result = parse_host_pattern(pattern).unwrap();
         assert_eq!(result, expected);
     }
@@ -87,6 +87,7 @@ mod tests {
             "prefix2.suffix",
             "prefix3.suffix",
             "prefix4.suffix",
+            "prefix5.suffix",
         ];
         let result = parse_host_pattern(pattern).unwrap();
         assert_eq!(result, expected);
@@ -95,7 +96,7 @@ mod tests {
     #[test]
     fn test_alphabetic_pattern_suffix() {
         let pattern = "host[a:d]";
-        let expected = vec!["hosta", "hostb", "hostc"];
+        let expected = vec!["hosta", "hostb", "hostc", "hostd"];
         let result = parse_host_pattern(pattern).unwrap();
         assert_eq!(result, expected);
     }
