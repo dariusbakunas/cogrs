@@ -62,78 +62,96 @@ fn parse_group(
 ) -> anyhow::Result<()> {
     debug!("Parsing {group_name} group");
 
-    // Stack to hold groups for processing
     let mut group_stack = vec![(group_name.to_string(), data.clone())];
 
     while let Some((current_group_name, current_data)) = group_stack.pop() {
         let group = groups
             .entry(current_group_name.clone())
-            .or_insert(Group::new(&current_group_name));
+            .or_insert_with(|| Group::new(&current_group_name));
 
         for (key, val) in &current_data {
             if let Value::String(key) = key {
                 match key.as_str() {
-                    "vars" => {
-                        // TODO: parse vars
-                        info!("Parsing vars in group: {current_group_name}");
-                    }
-                    "hosts" => {
-                        if let Value::Mapping(val) = val {
-                            for (host_key, host_val) in val {
-                                if let Value::String(host_pattern) = host_key {
-                                    let new_hosts = parse_host_pattern(host_pattern)?;
-                                    for host_name in new_hosts {
-                                        let host = hosts
-                                            .entry(host_name.to_string())
-                                            .or_insert(Host::new(&host_name));
-                                        group.add_host(&host.name);
-                                    }
-                                }
-                            }
-                        } else {
-                            error!(
-                                "YAML group has invalid structure, hosts should be a dictionary, got: {}",
-                                get_value_type(&val)
-                            );
-                        }
-                    }
-                    "children" => {
-                        if let Value::Mapping(val) = val {
-                            for (child_key, child_val) in val {
-                                if let Value::String(child_group_name) = child_key {
-                                    if let Value::Mapping(child_data) = child_val {
-                                        // Push child group onto the stack for processing
-                                        info!("Queueing child group: {child_group_name}");
-                                        group_stack.push((
-                                            child_group_name.to_string(),
-                                            child_data.clone(),
-                                        ));
-                                    } else if let Value::Null = child_val {
-                                        // Child group has no vars or hosts listed
-                                        info!("Queueing empty child group: {child_group_name}");
-                                        group_stack.push((
-                                            child_group_name.to_string(),
-                                            serde_yaml::Mapping::new(),
-                                        ));
-                                    } else {
-                                        error!(
-                                            "YAML group has invalid structure, children should be dictionaries, got: {}",
-                                            get_value_type(&child_val)
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    &_ => {
-                        warn!(
-                            "Skipping unexpected key \"{key}\" in group \"{current_group_name}\", only \"vars\", \"children\" and \"hosts\" are valid"
-                        );
-                    }
+                    "vars" => parse_group_vars(&current_group_name),
+                    "hosts" => parse_group_hosts(&current_group_name, val, hosts, group)?,
+                    "children" => parse_group_children(&current_group_name, val, &mut group_stack)?,
+                    _ => log_unexpected_key(key, &current_group_name),
                 }
             }
         }
     }
 
     Ok(())
+}
+
+/// Parses "vars" for the group.
+fn parse_group_vars(group_name: &str) {
+    info!("Parsing vars in group: {group_name}");
+    // TODO: Implement parsing logic for vars if needed
+}
+
+/// Parses "hosts" for the group.
+fn parse_group_hosts(
+    group_name: &str,
+    val: &Value,
+    hosts: &mut HashMap<String, Host>,
+    group: &mut Group,
+) -> anyhow::Result<()> {
+    if let Value::Mapping(val) = val {
+        for (host_key, _) in val {
+            if let Value::String(host_pattern) = host_key {
+                let new_hosts = parse_host_pattern(host_pattern)?;
+                for host_name in new_hosts {
+                    let host = hosts
+                        .entry(host_name.to_string())
+                        .or_insert_with(|| Host::new(&host_name));
+                    group.add_host(&host.name);
+                }
+            }
+        }
+    } else {
+        error!(
+            "YAML group has invalid structure, hosts should be a dictionary, got: {}",
+            get_value_type(&val)
+        );
+    }
+    Ok(())
+}
+
+/// Parses "children" for the group and adds them to the processing stack.
+fn parse_group_children(
+    group_name: &str,
+    val: &Value,
+    group_stack: &mut Vec<(String, serde_yaml::Mapping)>,
+) -> anyhow::Result<()> {
+    if let Value::Mapping(val) = val {
+        for (child_key, child_val) in val {
+            if let Value::String(child_group_name) = child_key {
+                let child_data = match child_val {
+                    Value::Mapping(data) => data.clone(),
+                    Value::Null => {
+                        debug!("Queueing empty child group: {child_group_name}");
+                        serde_yaml::Mapping::new()
+                    }
+                    _ => {
+                        error!(
+                            "YAML group 'children' field has invalid structure, expected dictionary or null, got: {}",
+                            get_value_type(&child_val)
+                        );
+                        continue;
+                    }
+                };
+                debug!("Queueing child group: {child_group_name}");
+                group_stack.push((child_group_name.to_string(), child_data));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Logs a warning for an unexpected key in the group.
+fn log_unexpected_key(key: &str, group_name: &str) {
+    warn!(
+        "Skipping unexpected key \"{key}\" in group \"{group_name}\", only \"vars\", \"children\" and \"hosts\" are valid"
+    );
 }
