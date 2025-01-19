@@ -4,7 +4,6 @@ mod modules;
 mod playbook;
 mod ssh;
 
-
 use anyhow::Result;
 use clap::Parser;
 use cli::Cli;

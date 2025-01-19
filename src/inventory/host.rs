@@ -1,5 +1,5 @@
 pub struct Host {
-    name: String,
+    pub name: String,
 }
 
 impl Host {

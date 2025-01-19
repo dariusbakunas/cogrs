@@ -7,7 +7,6 @@ pub fn parse_host_pattern(pattern: &str) -> anyhow::Result<Vec<String>> {
     // Match patterns of the form [start:end(:stride)?]
     let re = Regex::new(r"\[([a-zA-Z0-9]+):([a-zA-Z0-9]+)(?::(\d+))?]")?;
 
-
     let matches: Vec<_> = re.captures_iter(pattern).collect();
     if matches.len() > 1 {
         // Return an error if multiple patterns are detected
@@ -17,7 +16,9 @@ pub fn parse_host_pattern(pattern: &str) -> anyhow::Result<Vec<String>> {
         let full_match = &captures[0];
         let start = &captures[1];
         let end = &captures[2];
-        let stride = captures.get(3).map_or(1, |m| m.as_str().parse::<usize>().unwrap_or(1)); // Default stride is 1
+        let stride = captures
+            .get(3)
+            .map_or(1, |m| m.as_str().parse::<usize>().unwrap_or(1)); // Default stride is 1
 
         // Determine if the range is numeric or alphabetic
         if let (Ok(start_num), Ok(end_num)) = (start.parse::<usize>(), end.parse::<usize>()) {
@@ -27,7 +28,9 @@ pub fn parse_host_pattern(pattern: &str) -> anyhow::Result<Vec<String>> {
                 let generated_host = pattern.replace(full_match, &i.to_string());
                 hosts.push(generated_host);
             }
-        } else if let (Some(start_char), Some(end_char)) = (start.chars().next(), end.chars().next()) {
+        } else if let (Some(start_char), Some(end_char)) =
+            (start.chars().next(), end.chars().next())
+        {
             if start_char.is_alphabetic() && end_char.is_alphabetic() {
                 // Generate alphabetic range values with the given stride
                 let mut current = start_char as u32;
@@ -117,20 +120,29 @@ mod tests {
     fn test_invalid_numeric_pattern() {
         let pattern = "host[0:a]";
         let result = parse_host_pattern(pattern);
-        assert!(result.is_err(), "Expected error for invalid numeric pattern");
+        assert!(
+            result.is_err(),
+            "Expected error for invalid numeric pattern"
+        );
     }
 
     #[test]
     fn test_invalid_alphabetic_pattern() {
         let pattern = "prefix[0:z]suffix";
         let result = parse_host_pattern(pattern);
-        assert!(result.is_err(), "Expected error for invalid alphabetic pattern");
+        assert!(
+            result.is_err(),
+            "Expected error for invalid alphabetic pattern"
+        );
     }
 
     #[test]
     fn test_multiple_patterns_in_string() {
         let pattern = "host[0:3]-region[a:c]";
         let result = parse_host_pattern(pattern);
-        assert!(result.is_err(), "Multiple patterns are not currently supported");
+        assert!(
+            result.is_err(),
+            "Multiple patterns are not currently supported"
+        );
     }
 }

@@ -1,19 +1,18 @@
-pub mod manager;
-mod utils;
 mod group;
 mod host;
+pub mod manager;
+mod utils;
 
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
 use std::collections::{HashMap, HashSet};
 use std::io::Read;
-use anyhow::Result;
-use serde_yaml::Value;
-
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HostGroup {
     hosts: Option<HashMap<String, Value>>,
-    vars: Option<HashMap<String, Value>>
+    vars: Option<HashMap<String, Value>>,
 }
 
 pub struct DataLoader {}
@@ -47,8 +46,7 @@ pub fn merge_yaml_values(a: &mut Value, b: Value) {
 }
 
 pub fn load_inventory<R: Read>(reader: R) -> Result<HashMap<String, HostGroup>> {
-    let inventory: HashMap<String, HostGroup> =
-        serde_yaml::from_reader(reader)?;
+    let inventory: HashMap<String, HostGroup> = serde_yaml::from_reader(reader)?;
     Ok(inventory)
 }
 
@@ -100,9 +98,9 @@ pub fn filter_hosts(inventory: &HashMap<String, HostGroup>, pattern: &str) -> Ve
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::{HashMap};
-    use std::io::Cursor;
     use serde_yaml::Value::Null;
+    use std::collections::HashMap;
+    use std::io::Cursor;
 
     // Helper function to create a HostGroup with optional hosts
     fn create_host_group(hosts: Vec<&str>) -> HostGroup {
@@ -116,7 +114,10 @@ mod tests {
                     .collect(),
             )
         };
-        HostGroup { hosts: hosts_map, vars: None }
+        HostGroup {
+            hosts: hosts_map,
+            vars: None,
+        }
     }
 
     #[test]
@@ -328,7 +329,6 @@ mod tests {
           hosts: { invalid_yaml
         "#;
 
-
         let reader = Cursor::new(invalid_yaml);
         let result = load_inventory(reader);
 
@@ -352,18 +352,18 @@ mod tests {
             key1: value1
             key2:
               subkey1: subvalue1
-            "#
+            "#,
         )
-            .unwrap();
+        .unwrap();
 
         let b: Value = serde_yaml::from_str(
             r#"
             key3: value3
             key4:
               subkey2: subvalue2
-            "#
+            "#,
         )
-            .unwrap();
+        .unwrap();
 
         merge_yaml_values(&mut a, b);
 
@@ -375,9 +375,9 @@ mod tests {
             key3: value3
             key4:
               subkey2: subvalue2
-            "#
+            "#,
         )
-            .unwrap();
+        .unwrap();
 
         assert_eq!(a, expected);
     }
@@ -388,17 +388,17 @@ mod tests {
             r#"
             key1: value1
             key2: value2
-            "#
+            "#,
         )
-            .unwrap();
+        .unwrap();
 
         let b: Value = serde_yaml::from_str(
             r#"
             key2: new_value2
             key3: value3
-            "#
+            "#,
         )
-            .unwrap();
+        .unwrap();
 
         merge_yaml_values(&mut a, b);
 
@@ -407,9 +407,9 @@ mod tests {
             key1: value1
             key2: new_value2
             key3: value3
-            "#
+            "#,
         )
-            .unwrap();
+        .unwrap();
 
         assert_eq!(a, expected);
     }
@@ -422,18 +422,18 @@ mod tests {
               subkey1: value1
               subkey2: value2
             key2: outer_value
-            "#
+            "#,
         )
-            .unwrap();
+        .unwrap();
 
         let b: Value = serde_yaml::from_str(
             r#"
             key1:
               subkey2: new_value2
               subkey3: value3
-            "#
+            "#,
         )
-            .unwrap();
+        .unwrap();
 
         merge_yaml_values(&mut a, b);
 
@@ -444,9 +444,9 @@ mod tests {
               subkey2: new_value2
               subkey3: value3
             key2: outer_value
-            "#
+            "#,
         )
-            .unwrap();
+        .unwrap();
 
         assert_eq!(a, expected);
     }
@@ -458,18 +458,18 @@ mod tests {
             key1: value1
             key2: value2
             key3: non_object_value
-            "#
+            "#,
         )
-            .unwrap();
+        .unwrap();
 
         let b: Value = serde_yaml::from_str(
             r#"
             key3:
               subkey: subvalue
             key4: value4
-            "#
+            "#,
         )
-            .unwrap();
+        .unwrap();
 
         merge_yaml_values(&mut a, b);
 
@@ -480,9 +480,9 @@ mod tests {
             key3:
               subkey: subvalue
             key4: value4
-            "#
+            "#,
         )
-            .unwrap();
+        .unwrap();
 
         assert_eq!(a, expected);
     }
@@ -494,9 +494,9 @@ mod tests {
             key1:
               subkey1: value1
             key2: value2
-            "#
+            "#,
         )
-            .unwrap();
+        .unwrap();
 
         let b: Value = serde_yaml::from_str("").unwrap(); // Empty
 
@@ -507,9 +507,9 @@ mod tests {
             key1:
               subkey1: value1
             key2: value2
-            "#
+            "#,
         )
-            .unwrap();
+        .unwrap();
 
         assert_eq!(a, expected);
     }
@@ -523,9 +523,9 @@ mod tests {
             key1:
               subkey1: value1
             key2: value2
-            "#
+            "#,
         )
-            .unwrap();
+        .unwrap();
 
         merge_yaml_values(&mut a, b);
 
@@ -534,9 +534,9 @@ mod tests {
             key1:
               subkey1: value1
             key2: value2
-            "#
+            "#,
         )
-            .unwrap();
+        .unwrap();
 
         assert_eq!(a, expected);
     }
@@ -549,17 +549,17 @@ mod tests {
               subkey1: value1
             key2:
               subkey2: value2
-            "#
+            "#,
         )
-            .unwrap();
+        .unwrap();
 
         let b: Value = serde_yaml::from_str(
             r#"
             key2: new_value2
             key3: value3
-            "#
+            "#,
         )
-            .unwrap();
+        .unwrap();
 
         merge_yaml_values(&mut a, b);
 
@@ -569,9 +569,9 @@ mod tests {
               subkey1: value1
             key2: new_value2
             key3: value3
-            "#
+            "#,
         )
-            .unwrap();
+        .unwrap();
 
         assert_eq!(a, expected);
     }

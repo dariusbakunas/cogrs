@@ -1,8 +1,8 @@
-mod inventory;
 mod cli;
+mod inventory;
 
-use anyhow::Result;
 use crate::inventory::manager;
+use anyhow::Result;
 
 pub fn run(inventory: Option<&Vec<String>>) -> Result<()> {
     let mut manager = manager::InventoryManager::new();

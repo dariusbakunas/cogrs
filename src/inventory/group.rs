@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde_yaml::Value;
+use std::collections::HashMap;
 
 pub struct Group {
     name: String,

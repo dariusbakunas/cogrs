@@ -1,39 +1,26 @@
+use crate::inventory::group::Group;
+use crate::inventory::host::Host;
+use crate::inventory::utils::parse_host_pattern;
+use anyhow::{bail, Result};
+use log::{debug, error, info, warn};
+use regex::Regex;
+use serde::de::VariantAccess;
+use serde_yaml;
+use serde_yaml::Value;
 use std::any::Any;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use log::{debug, error, info, warn};
-use serde_yaml;
-use anyhow::{bail, Result};
-use regex::Regex;
-use serde::de::VariantAccess;
-use serde_yaml::Value;
-use crate::inventory::utils::parse_host_pattern;
-
 
 fn get_value_type(val: &Value) -> &str {
     match val {
-        Value::String(_) => {
-            "String"
-        },
-        Value::Null => {
-            "Null"
-        }
-        Value::Bool(_) => {
-            "Bool"
-        }
-        Value::Number(_) => {
-            "Number"
-        }
-        Value::Sequence(_) => {
-            "Sequence"
-        }
-        Value::Mapping(_) => {
-            "Mapping"
-        }
-        Value::Tagged(_) => {
-            "Tagged"
-        }
+        Value::String(_) => "String",
+        Value::Null => "Null",
+        Value::Bool(_) => "Bool",
+        Value::Number(_) => "Number",
+        Value::Sequence(_) => "Sequence",
+        Value::Mapping(_) => "Mapping",
+        Value::Tagged(_) => "Tagged",
     }
 }
 
@@ -44,9 +31,9 @@ pub struct InventoryManager {
 
 impl InventoryManager {
     pub fn new() -> Self {
-        InventoryManager{
+        InventoryManager {
             groups: HashMap::new(),
-            hosts: HashMap::new()
+            hosts: HashMap::new(),
         }
     }
 
@@ -67,7 +54,10 @@ impl InventoryManager {
 
     fn parse_group(&mut self, group_name: &str, data: &serde_yaml::Mapping) -> Result<&Group> {
         debug!("Parsing {group_name} group");
-        let group = self.groups.entry(group_name.to_string()).or_insert(Group::new(group_name));
+        let group = self
+            .groups
+            .entry(group_name.to_string())
+            .or_insert(Group::new(group_name));
 
         for (key, val) in data {
             if let Value::String(key) = key {
@@ -94,7 +84,10 @@ impl InventoryManager {
                             if let Value::String(host_pattern) = key {
                                 let hosts = parse_host_pattern(host_pattern)?;
                                 for host_name in hosts {
-                                    let host = self.hosts.entry(host_name.to_string()).or_insert(Host::new(&host_name));
+                                    let host = self
+                                        .hosts
+                                        .entry(host_name.to_string())
+                                        .or_insert(Host::new(&host_name));
                                     group.add_host(&host.name);
                                 }
                             }
@@ -120,8 +113,8 @@ impl InventoryManager {
                 let paths = fs::read_dir(path)?;
 
                 // Regex to match hidden files or specific directories to exclude
-                let exclude_pattern = Regex::new(r"^(?:\.|host_vars|group_vars|vars_plugins)(/|$)")?;
-
+                let exclude_pattern =
+                    Regex::new(r"^(?:\.|host_vars|group_vars|vars_plugins)(/|$)")?;
 
                 for path in paths {
                     if let Ok(entry) = path {
