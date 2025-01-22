@@ -1,11 +1,11 @@
-use crate::inventory::group::Group;
-use crate::inventory::host::Host;
-use crate::inventory::utils::parse_host_pattern;
+use super::group::Group;
+use super::host::Host;
+use super::utils::parse_host_pattern;
 use anyhow::{bail, Result};
+use hashbrown::HashMap;
 use log::{debug, error, info, warn};
 use serde_yaml;
 use serde_yaml::Value;
-use std::collections::HashMap;
 use std::path::Path;
 
 fn get_value_type(val: &Value) -> &str {
@@ -62,22 +62,43 @@ fn parse_group(
 ) -> anyhow::Result<()> {
     debug!("Parsing {group_name} group");
 
-    let mut group_stack = vec![(group_name.to_string(), data.clone())];
+    let mut group_stack: Vec<(String, serde_yaml::Mapping, Option<String>)> =
+        vec![(group_name.to_string(), data.clone(), None)];
 
-    while let Some((current_group_name, current_data)) = group_stack.pop() {
-        let group = groups
-            .entry(current_group_name.clone())
-            .or_insert_with(|| Group::new(&current_group_name));
+    while let Some((current_group_name, current_data, parent_group_name)) = group_stack.pop() {
+        {
+            let group = groups
+                .entry(current_group_name.to_string())
+                .or_insert_with(|| Group::new(&current_group_name));
 
-        for (key, val) in &current_data {
-            if let Value::String(key) = key {
-                match key.as_str() {
-                    "vars" => parse_group_vars(&current_group_name),
-                    "hosts" => parse_group_hosts(&current_group_name, val, hosts, group)?,
-                    "children" => parse_group_children(&current_group_name, val, &mut group_stack)?,
-                    _ => log_unexpected_key(key, &current_group_name),
+            for (key, val) in &current_data {
+                if let Value::String(key) = key {
+                    match key.as_str() {
+                        "vars" => parse_group_vars(&current_group_name),
+                        "hosts" => parse_group_hosts(&current_group_name, val, hosts, group)?,
+                        "children" => {
+                            parse_group_children(&current_group_name, val, &mut group_stack)?
+                        }
+                        _ => log_unexpected_key(key, &current_group_name),
+                    }
                 }
             }
+        }
+
+        if let Some(parent_group_name) = parent_group_name {
+            let [Some(parent_group), Some(child_group)] =
+                groups.get_many_mut([&parent_group_name, &current_group_name])
+            else {
+                anyhow::bail!("Parent group {parent_group_name} or child group {current_group_name} does not exist in the provided groups collection")
+            };
+
+            let mut parent_group = parent_group.clone();
+            let mut child_group = child_group.clone();
+
+            parent_group.add_child_group(&mut child_group, groups)?;
+
+            groups.insert(parent_group.name.clone(), parent_group);
+            groups.insert(child_group.name.clone(), child_group);
         }
     }
 
@@ -122,7 +143,7 @@ fn parse_group_hosts(
 fn parse_group_children(
     group_name: &str,
     val: &Value,
-    group_stack: &mut Vec<(String, serde_yaml::Mapping)>,
+    group_stack: &mut Vec<(String, serde_yaml::Mapping, Option<String>)>,
 ) -> anyhow::Result<()> {
     if let Value::Mapping(val) = val {
         for (child_key, child_val) in val {
@@ -142,7 +163,12 @@ fn parse_group_children(
                     }
                 };
                 debug!("Queueing child group: {child_group_name}");
-                group_stack.push((child_group_name.to_string(), child_data));
+                group_stack.push((
+                    child_group_name.to_string(),
+                    child_data,
+                    Some(group_name.to_string()),
+                ));
+                // TODO: add this child to parent group
             }
         }
     }

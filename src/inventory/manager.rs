@@ -1,11 +1,10 @@
-use crate::inventory::group::Group;
-use crate::inventory::host::Host;
-use crate::inventory::utils::parse_host_pattern;
-use crate::inventory::yml::parse_yaml_file;
-use anyhow::{bail, Result};
-use log::{debug, error, info, warn};
+use super::group::Group;
+use super::host::Host;
+use super::yml::parse_yaml_file;
+use anyhow::Result;
+use hashbrown::HashMap;
+use log::{debug, info, warn};
 use regex::Regex;
-use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 

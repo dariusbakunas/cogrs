@@ -1,5 +1,13 @@
 use anyhow::bail;
 use regex::Regex;
+use std::collections::HashSet;
+
+pub fn difference_update<T: Eq + std::hash::Hash>(set: &mut HashSet<T>, other: &HashSet<T>) {
+    // Iterate over elements of `other` - remove them from `set`
+    for item in other {
+        set.remove(item);
+    }
+}
 
 pub fn parse_host_pattern(pattern: &str) -> anyhow::Result<Vec<String>> {
     let mut hosts = Vec::new();
