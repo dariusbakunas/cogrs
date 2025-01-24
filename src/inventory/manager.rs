@@ -27,9 +27,8 @@ impl InventoryManager {
         hosts
     }
 
-    pub fn list_groups(&self) -> Vec<String> {
-        let mut groups: Vec<String> = self.groups.keys().cloned().collect();
-        groups.sort();
+    pub fn list_groups(&self) -> Vec<Group> {
+        let mut groups: Vec<Group> = self.groups.values().cloned().collect();
         groups
     }
 

@@ -1,10 +1,11 @@
+use crate::inventory::utils::difference_update_vec;
 use anyhow::{bail, Result};
 use hashbrown::HashMap;
 use log::{debug, warn};
 use serde_yaml::Value;
 use std::collections::HashSet;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Group {
     pub name: String,
     depth: u32,
@@ -33,11 +34,18 @@ impl Group {
         }
     }
 
-    pub fn get_ancestors(&self, groups: &HashMap<String, Group>) -> Vec<String> {
+    pub fn walk_relationships(&self, groups: &HashMap<String, Group>, parent: bool) -> Vec<String> {
         let mut seen: HashSet<String> = HashSet::new();
-        let mut unprocessed: HashSet<String> =
-            HashSet::from_iter(self.parent_groups.iter().cloned());
-        let mut ancestors: Vec<String> = self.parent_groups.clone();
+        let mut unprocessed: HashSet<String> = if parent {
+            HashSet::from_iter(self.parent_groups.iter().cloned())
+        } else {
+            HashSet::from_iter(self.child_groups.iter().cloned())
+        };
+        let mut relations: Vec<String> = if parent {
+            self.parent_groups.clone()
+        } else {
+            self.child_groups.clone()
+        };
 
         while !unprocessed.is_empty() {
             seen.extend(unprocessed.iter().cloned());
@@ -50,7 +58,7 @@ impl Group {
                         // Only add to new_unprocessed if it hasn't already been seen:
                         if !seen.contains(parent) {
                             new_unprocessed.insert(parent.clone());
-                            ancestors.push(parent.clone());
+                            relations.push(parent.clone());
                         }
                     }
                 } else {
@@ -62,13 +70,15 @@ impl Group {
             unprocessed = new_unprocessed;
         }
 
-        ancestors
+        relations
     }
 
-    pub fn add_parent_group(&mut self, parent_group_name: &str) {
-        if !self.parent_groups.contains(&parent_group_name.to_string()) {
-            self.parent_groups.push(parent_group_name.to_string());
-        }
+    pub fn get_ancestors(&self, groups: &HashMap<String, Group>) -> Vec<String> {
+        self.walk_relationships(groups, true)
+    }
+
+    pub fn get_descendants(&self, groups: &HashMap<String, Group>) -> Vec<String> {
+        self.walk_relationships(groups, false)
     }
 
     pub fn add_child_group(
@@ -82,6 +92,14 @@ impl Group {
             bail!("Can't add group to itself: {child_group_name}!")
         }
 
+        if self.child_groups.contains(&child_group_name.to_string()) {
+            warn!(
+                "Group '{child_group_name}' already exists in '{}'",
+                self.name
+            );
+            return Ok(());
+        }
+
         debug!("Adding child group '{child_group_name}' to '{}'", self.name);
 
         let start_ancestors = child_group.get_ancestors(groups);
@@ -92,11 +110,55 @@ impl Group {
         }
 
         new_ancestors.push(self.name.to_string());
-        //difference_update(&mut new_ancestors, &start_ancestors);
-        //child_group.
+        difference_update_vec(&mut new_ancestors, &start_ancestors);
 
         self.child_groups.push(child_group.name.clone());
-        child_group.add_parent_group(&self.name);
+
+        if self.depth + 1 > child_group.depth {
+            child_group.depth = self.depth + 1;
+            child_group.check_children_depth(groups)?;
+        }
+
+        if !child_group.parent_groups.contains(&self.name.to_string()) {
+            child_group.parent_groups.push(self.name.to_string());
+
+            // TODO: populate ancestors for all child group hosts
+        }
+
+        Ok(())
+    }
+
+    fn check_children_depth(&self, groups: &mut HashMap<String, Group>) -> Result<()> {
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut unprocessed: HashSet<String> =
+            HashSet::from_iter(self.parent_groups.iter().cloned());
+        let mut depth = self.depth;
+        let start_depth = self.depth;
+
+        while !unprocessed.is_empty() {
+            seen.extend(unprocessed.iter().cloned());
+            depth += 1;
+
+            let mut new_unprocessed: HashSet<String> = HashSet::new();
+
+            for group_name in &unprocessed {
+                if let Some(group) = groups.get_mut(group_name) {
+                    if group.depth < depth {
+                        group.depth = depth;
+                        new_unprocessed.insert(group_name.to_string());
+                    }
+                }
+            }
+
+            unprocessed = new_unprocessed;
+
+            if depth - start_depth > seen.len() as u32 {
+                bail!(
+                    "The group named '{}' has a recursive dependency loop.",
+                    self.name
+                );
+            }
+        }
 
         Ok(())
     }
