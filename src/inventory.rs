@@ -2,6 +2,7 @@ pub mod group;
 pub mod host;
 pub mod manager;
 pub mod utils;
+pub mod vars;
 pub mod yml;
 
 use anyhow::Result;

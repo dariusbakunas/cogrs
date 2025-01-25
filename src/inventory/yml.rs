@@ -1,7 +1,8 @@
 use super::group::Group;
 use super::host::Host;
 use super::utils::parse_host_pattern;
-use anyhow::Result;
+use crate::inventory::vars::Variable;
+use anyhow::{bail, Result};
 use hashbrown::HashMap;
 use log::{debug, error, info, warn};
 use serde_yaml;
@@ -66,21 +67,17 @@ fn parse_group(
         vec![(group_name.to_string(), data.clone(), None)];
 
     while let Some((current_group_name, current_data, parent_group_name)) = group_stack.pop() {
-        {
-            let group = groups
-                .entry(current_group_name.to_string())
-                .or_insert_with(|| Group::new(&current_group_name));
+        let group = groups
+            .entry(current_group_name.to_string())
+            .or_insert_with(|| Group::new(&current_group_name));
 
-            for (key, val) in &current_data {
-                if let Value::String(key) = key {
-                    match key.as_str() {
-                        "vars" => parse_group_vars(&current_group_name),
-                        "hosts" => parse_group_hosts(group, val, hosts)?,
-                        "children" => {
-                            parse_group_children(&current_group_name, val, &mut group_stack)?
-                        }
-                        _ => log_unexpected_key(key, &current_group_name),
-                    }
+        for (key, val) in &current_data {
+            if let Value::String(key) = key {
+                match key.as_str() {
+                    "vars" => parse_group_vars(group, val)?,
+                    "hosts" => parse_group_hosts(group, val, hosts)?,
+                    "children" => parse_group_children(&current_group_name, val, &mut group_stack)?,
+                    _ => log_unexpected_key(key, &current_group_name),
                 }
             }
         }
@@ -106,9 +103,28 @@ fn parse_group(
 }
 
 /// Parses "vars" for the group.
-fn parse_group_vars(group_name: &str) {
-    info!("Parsing vars in group: {group_name}");
-    // TODO: Implement parsing logic for vars if needed
+fn parse_group_vars(group: &mut Group, val: &Value) -> Result<()> {
+    info!("Parsing vars in group: {}", group.name);
+    if let Value::Mapping(val) = val {
+        for (key, val) in val.iter() {
+            if let Value::String(key) = key {
+                let value = Variable::try_from(val)?;
+                group.set_variable(key, value)
+            } else {
+                bail!(
+                    "YAML group has invalid structure, vars keys should be strings, got: {}",
+                    get_value_type(&key)
+                )
+            }
+        }
+    } else {
+        bail!(
+            "YAML group has invalid structure, vars should be a dictionary, got: {}",
+            get_value_type(&val)
+        )
+    }
+
+    Ok(())
 }
 
 /// Parses "hosts" for the group.

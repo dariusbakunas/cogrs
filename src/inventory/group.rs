@@ -1,16 +1,17 @@
 use crate::inventory::host::Host;
 use crate::inventory::utils::difference_update_vec;
+use crate::inventory::vars::Variable;
 use anyhow::{bail, Result};
 use hashbrown::HashMap;
 use log::{debug, warn};
-use serde_yaml::Value;
 use std::collections::HashSet;
 
 #[derive(Clone, Debug)]
 pub struct Group {
     pub name: String,
     depth: u32,
-    vars: HashMap<String, Value>,
+    priority: i64,
+    vars: HashMap<String, Variable>,
     hosts: Vec<String>,
     pub child_groups: Vec<String>,
     parent_groups: Vec<String>,
@@ -21,6 +22,7 @@ impl Group {
         Group {
             name: name.to_string(),
             depth: 0,
+            priority: 1,
             vars: HashMap::new(),
             hosts: Vec::new(),
             child_groups: Vec::new(),
@@ -37,6 +39,10 @@ impl Group {
 
     pub fn get_hosts(&self) -> Vec<String> {
         self.hosts.clone()
+    }
+
+    pub fn set_priority(&mut self, priority: i64) {
+        self.priority = priority;
     }
 
     pub fn walk_relationships(&self, groups: &HashMap<String, Group>, parent: bool) -> Vec<String> {
@@ -138,6 +144,38 @@ impl Group {
         }
 
         Ok(())
+    }
+
+    /// Sets a variable in the group's `vars` map.
+    ///
+    /// # Parameters
+    /// - `key`: The key of the variable to be set.
+    /// - `value`: The value of the variable of type `Variable`.
+    ///
+    /// # Behavior
+    /// - If the `key` is `"ansible_group_priority"`, this method will set the group's priority
+    /// - Otherwise the `value` is directly inserted or updated in `self.vars`.
+    ///
+    /// # Example
+    /// ```rust
+    /// use cogrs::inventory::group::Group;
+    /// use cogrs::inventory::vars::Variable;
+    /// let mut group = Group::new("example_group");
+    /// let variable = Variable::String(String::from("example"));  // Replace with actual `Variable` type instance
+    /// group.set_variable("key_name", variable);
+    /// ```
+    pub fn set_variable(&mut self, key: &str, value: Variable) {
+        if key.eq("ansible_group_priority") {
+            if let Variable::Number(val) = value {
+                if let Some(val) = val.as_i64() {
+                    self.set_priority(val);
+                } else {
+                    warn!("Invalid ansible_group_priority value: {:?}", val);
+                }
+            }
+        } else {
+            self.vars.insert(key.to_string(), value);
+        }
     }
 
     fn check_children_depth(&self, groups: &mut HashMap<String, Group>) -> Result<()> {
