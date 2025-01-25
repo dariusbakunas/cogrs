@@ -75,7 +75,7 @@ fn parse_group(
                 if let Value::String(key) = key {
                     match key.as_str() {
                         "vars" => parse_group_vars(&current_group_name),
-                        "hosts" => parse_group_hosts(&current_group_name, val, hosts, group)?,
+                        "hosts" => parse_group_hosts(group, val, hosts)?,
                         "children" => {
                             parse_group_children(&current_group_name, val, &mut group_stack)?
                         }
@@ -95,7 +95,7 @@ fn parse_group(
             let mut parent_group = parent_group.clone();
             let mut child_group = child_group.clone();
 
-            parent_group.add_child_group(&mut child_group, groups)?;
+            parent_group.add_child_group(&mut child_group, groups, hosts)?;
 
             groups.insert(parent_group.name.clone(), parent_group);
             groups.insert(child_group.name.clone(), child_group);
@@ -113,10 +113,9 @@ fn parse_group_vars(group_name: &str) {
 
 /// Parses "hosts" for the group.
 fn parse_group_hosts(
-    group_name: &str,
+    group: &mut Group,
     val: &Value,
     hosts: &mut HashMap<String, Host>,
-    group: &mut Group,
 ) -> anyhow::Result<()> {
     if let Value::Mapping(val) = val {
         for (host_key, _) in val {
@@ -127,6 +126,7 @@ fn parse_group_hosts(
                         .entry(host_name.to_string())
                         .or_insert_with(|| Host::new(&host_name));
                     group.add_host(&host.name);
+                    host.add_group(group.name.clone())
                 }
             }
         }

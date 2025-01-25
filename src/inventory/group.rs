@@ -1,3 +1,4 @@
+use crate::inventory::host::Host;
 use crate::inventory::utils::difference_update_vec;
 use anyhow::{bail, Result};
 use hashbrown::HashMap;
@@ -32,6 +33,10 @@ impl Group {
         if !self.hosts.contains(&name) {
             self.hosts.push(name);
         }
+    }
+
+    pub fn get_hosts(&self) -> Vec<String> {
+        self.hosts.clone()
     }
 
     pub fn walk_relationships(&self, groups: &HashMap<String, Group>, parent: bool) -> Vec<String> {
@@ -85,6 +90,7 @@ impl Group {
         &mut self,
         child_group: &mut Group,
         groups: &mut HashMap<String, Group>,
+        hosts: &mut HashMap<String, Host>,
     ) -> Result<()> {
         let child_group_name = &child_group.name;
 
@@ -122,7 +128,13 @@ impl Group {
         if !child_group.parent_groups.contains(&self.name.to_string()) {
             child_group.parent_groups.push(self.name.to_string());
 
-            // TODO: populate ancestors for all child group hosts
+            for host in child_group.hosts.iter() {
+                if let Some(host) = hosts.get_mut(host) {
+                    host.populate_ancestors(new_ancestors.clone());
+                } else {
+                    bail!("Unknown host: '{host}'");
+                }
+            }
         }
 
         Ok(())
