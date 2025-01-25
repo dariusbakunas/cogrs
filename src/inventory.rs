@@ -1,8 +1,8 @@
-mod group;
-mod host;
+pub mod group;
+pub mod host;
 pub mod manager;
-mod utils;
-mod yml;
+pub mod utils;
+pub mod yml;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};

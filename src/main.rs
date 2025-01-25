@@ -1,5 +1,4 @@
 mod cli;
-mod inventory;
 mod modules;
 mod playbook;
 mod ssh;

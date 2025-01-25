@@ -1,7 +1,7 @@
 use super::group::Group;
 use super::host::Host;
 use super::utils::parse_host_pattern;
-use anyhow::{bail, Result};
+use anyhow::Result;
 use hashbrown::HashMap;
 use log::{debug, error, info, warn};
 use serde_yaml;
@@ -126,7 +126,7 @@ fn parse_group_hosts(
                         .entry(host_name.to_string())
                         .or_insert_with(|| Host::new(&host_name));
                     group.add_host(&host.name);
-                    host.add_group(group.name.clone())
+                    host.add_group(&group.name)
                 }
             }
         }

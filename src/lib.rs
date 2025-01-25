@@ -1,5 +1,5 @@
 mod cli;
-mod inventory;
+pub mod inventory;
 
 use crate::inventory::manager;
 use anyhow::Result;

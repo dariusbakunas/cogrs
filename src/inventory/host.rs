@@ -12,15 +12,16 @@ impl Host {
         }
     }
 
-    pub fn add_group(&mut self, group: String) {
-        if !self.groups.contains(&group) {
-            self.groups.push(group.to_string());
+    pub fn add_group(&mut self, group: &str) {
+        let group_name = group.to_string();
+        if !self.groups.contains(&group_name) {
+            self.groups.push(group_name);
         }
     }
 
     pub fn populate_ancestors(&mut self, ancestors: Vec<String>) {
         for ancestor_name in &ancestors {
-            self.add_group(ancestor_name.to_string());
+            self.add_group(ancestor_name);
         }
     }
 }

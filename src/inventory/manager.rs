@@ -3,7 +3,7 @@ use super::host::Host;
 use super::yml::parse_yaml_file;
 use anyhow::Result;
 use hashbrown::HashMap;
-use log::{debug, info, warn};
+use log::debug;
 use regex::Regex;
 use std::fs;
 use std::path::Path;
@@ -22,7 +22,7 @@ impl InventoryManager {
     }
 
     pub fn list_hosts(&self) -> Vec<Host> {
-        let mut hosts: Vec<Host> = self.hosts.values().cloned().collect();
+        let hosts: Vec<Host> = self.hosts.values().cloned().collect();
         hosts
     }
 
@@ -41,7 +41,7 @@ impl InventoryManager {
         Ok(())
     }
 
-    fn parse_source(&mut self, source: &str) -> Result<()> {
+    pub fn parse_source(&mut self, source: &str) -> Result<()> {
         debug!("Examining source {}", source);
         let path = Path::new(source);
 

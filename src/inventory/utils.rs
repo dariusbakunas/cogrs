@@ -1,6 +1,5 @@
 use anyhow::bail;
 use regex::Regex;
-use std::collections::HashSet;
 
 pub fn difference_update_vec<T: PartialEq>(vec: &mut Vec<T>, other: &Vec<T>) {
     // Iterate over elements of `other` - remove them from `vec`
