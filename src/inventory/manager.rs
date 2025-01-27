@@ -96,44 +96,59 @@ impl InventoryManager {
         }
     }
 
-    pub fn filter_hosts(&self, limit: Option<&str>, pattern: &str) -> Result<Vec<Host>> {
-        if self.hosts.is_empty() && LOCALHOST.contains(&pattern) {
-            warn!("Provided hosts list is empty, only localhost is available. Note that the implicit localhost does not match 'all'");
-        }
-
+    fn get_combined_patterns(&self, limit: Option<&str>, pattern: &str) -> Vec<String> {
         let stripped_pattern = pattern.trim_start_matches('\'').trim_end_matches('\'');
-
-        let mut combined_patterns = Vec::new();
-
-        combined_patterns.extend(stripped_pattern.split(',').map(|p| p.trim().to_string()));
+        let mut combined_patterns: Vec<String> = stripped_pattern
+            .split(',')
+            .map(|p| p.trim().to_string())
+            .collect();
 
         if let Some(limit) = limit {
             let stripped_limit = limit.trim_start_matches('\'').trim_end_matches('\'');
             combined_patterns.extend(stripped_limit.split(',').map(|p| p.trim().to_string()));
         }
 
-        // Resolve all patterns, expanding from files where necessary
-        let mut resolved_patterns = self.resolve_patterns(&combined_patterns);
+        combined_patterns
+    }
 
-        // Sort resolved patterns by priority
+    fn resolve_and_sort_patterns(&self, patterns: &[String]) -> Vec<String> {
+        let mut resolved_patterns = self.resolve_patterns(patterns);
         resolved_patterns.sort_by(|a, b| {
             self.get_pattern_priority(a)
                 .cmp(&self.get_pattern_priority(b))
         });
+        resolved_patterns
+    }
+
+    fn filter_with_limit(&self, selected_hosts: Vec<String>, limit: &str) -> Result<Vec<String>> {
+        let patterns: Vec<String> = limit.split(',').map(|p| p.trim().to_string()).collect();
+        let resolved_limit_patterns = self.resolve_patterns(&patterns);
+
+        let limit_hosts = self.apply_patterns(resolved_limit_patterns)?;
+        let limit_host_set: HashSet<String> = limit_hosts.into_iter().collect();
+
+        Ok(selected_hosts
+            .into_iter()
+            .filter(|host| limit_host_set.contains(host))
+            .collect())
+    }
+
+    pub fn filter_hosts(&self, limit: Option<&str>, pattern: &str) -> Result<Vec<Host>> {
+        if self.hosts.is_empty() && LOCALHOST.contains(&pattern) {
+            warn!("Provided hosts list is empty, only localhost is available. Note that the implicit localhost does not match 'all'");
+        }
+
+        let combined_patterns = self.get_combined_patterns(limit, pattern);
+
+        // Resolve all patterns, expanding from files where necessary
+        let resolved_patterns = self.resolve_and_sort_patterns(&combined_patterns);
 
         // Apply resolved patterns to filter hosts
         let mut selected_hosts = self.apply_patterns(resolved_patterns)?;
 
         if let Some(limit) = limit {
-            let patterns: Vec<String> = limit.split(',').map(|p| p.trim().to_string()).collect();
-            let resolved_patterns = self.resolve_patterns(&patterns);
-            let limit_hosts = self.apply_patterns(resolved_patterns)?;
-            let limit_host_set: HashSet<String> = limit_hosts.into_iter().collect();
-
-            selected_hosts = selected_hosts
-                .into_iter()
-                .filter(|host| limit_host_set.contains(host))
-                .collect();
+            // only keep hosts that match limit specification
+            selected_hosts = self.filter_with_limit(selected_hosts, limit)?;
         }
 
         // TODO: handle localhost and all
@@ -193,43 +208,27 @@ impl InventoryManager {
     }
 
     fn apply_subscript(&self, hosts: &Vec<String>, start: i32, end: Option<i32>) -> Vec<String> {
+        if hosts.is_empty() {
+            return vec![];
+        }
+
         let len = hosts.len() as i32;
 
-        // Handle negative indexing for `start`
+        // Compute start index, handling negative indexing
         let start_idx = if start < 0 { len + start } else { start };
 
-        // If end is not set, use just the `start`
-        if end.is_none() {
-            if start_idx >= 0 && start_idx < len {
-                return vec![hosts[start_idx as usize].clone()];
-            } else {
-                return vec![];
-            }
-        }
+        // Compute end index, handling negative indexing, defaulting to `start` if `end` is None
+        let end_idx = end
+            .map(|e| if e < 0 { len + e } else { e })
+            .unwrap_or(start_idx);
 
-        // Handle negative indexing for `end`
-        let end_idx = if let Some(end_val) = end {
-            if end_val < 0 {
-                len + end_val
-            } else {
-                end_val
-            }
-        } else {
-            len
-        };
-
-        if start_idx < 0 || start_idx >= len {
+        // Validate indices
+        if start_idx < 0 || start_idx >= len || end_idx < 0 || end_idx >= len || start_idx > end_idx
+        {
             return vec![];
         }
 
-        if end_idx < 0 || end_idx >= len {
-            return vec![];
-        }
-
-        if start_idx >= end_idx {
-            return vec![];
-        }
-
+        // Extract and return the slice of hosts
         hosts[start_idx as usize..=end_idx as usize].to_vec()
     }
 
