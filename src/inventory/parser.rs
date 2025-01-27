@@ -9,8 +9,6 @@ use std::path::Path;
 
 pub struct InventoryParser;
 
-impl InventoryParser {}
-
 impl InventoryParser {
     pub fn parse_source(
         source: &str,
