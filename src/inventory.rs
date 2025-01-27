@@ -1,6 +1,7 @@
 pub mod group;
 pub mod host;
 pub mod manager;
+mod parser;
 pub mod utils;
 pub mod vars;
 pub mod yml;
