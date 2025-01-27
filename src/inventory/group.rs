@@ -71,54 +71,51 @@ impl Group {
         parent: bool,
         include_self: bool,
     ) -> Vec<String> {
-        let mut seen: HashSet<String> = HashSet::new();
-        let mut unprocessed: HashSet<String> = if parent {
-            HashSet::from_iter(self.parent_groups.iter().cloned())
+        let mut seen = HashSet::new();
+        let mut to_process: HashSet<String> = if parent {
+            self.parent_groups.iter().cloned().collect()
         } else {
-            HashSet::from_iter(self.child_groups.iter().cloned())
+            self.child_groups.iter().cloned().collect()
         };
 
-        let mut relations: Vec<String> = if parent {
-            self.parent_groups.clone()
-        } else {
-            self.child_groups.clone()
-        };
+        let mut relationships = Vec::new();
 
         if include_self {
-            // TODO: make it first on the list
-            relations.push(self.name.to_string());
+            relationships.push(self.name.clone());
         }
 
-        while !unprocessed.is_empty() {
-            seen.extend(unprocessed.iter().cloned());
+        // Add initial parent/child groups to the result.
+        relationships.extend(to_process.iter().cloned());
 
-            let mut new_unprocessed: HashSet<String> = HashSet::new();
+        // Process until there are no more groups to evaluate.
+        while !to_process.is_empty() {
+            seen.extend(to_process.iter().cloned());
 
-            for group_name in &unprocessed {
+            let mut new_to_process = HashSet::new();
+
+            for group_name in &to_process {
                 if let Some(group) = groups.get(group_name) {
-                    let groups = if parent {
+                    let related_groups = if parent {
                         &group.parent_groups
                     } else {
                         &group.child_groups
                     };
 
-                    for parent in groups {
-                        // Only add to new_unprocessed if it hasn't already been seen:
-                        if !seen.contains(parent) {
-                            new_unprocessed.insert(parent.clone());
-                            relations.push(parent.clone());
+                    for related_group in related_groups {
+                        if seen.insert(related_group.clone()) {
+                            new_to_process.insert(related_group.clone());
+                            relationships.push(related_group.clone());
                         }
                     }
                 } else {
-                    warn!("Ancestor group {group_name} was not found in group collection");
+                    warn!("Group '{group_name}' not found in the group collection");
                 }
             }
 
-            // Update unprocessed for the next iteration.
-            unprocessed = new_unprocessed;
+            to_process = new_to_process;
         }
 
-        relations
+        relationships
     }
 
     pub fn get_ancestors(
