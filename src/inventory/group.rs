@@ -37,8 +37,28 @@ impl Group {
         }
     }
 
-    pub fn get_hosts(&self) -> Vec<String> {
-        self.hosts.clone()
+    pub fn get_hosts(
+        &self,
+        groups: &IndexMap<String, Group>,
+        include_children: bool,
+    ) -> Result<Vec<String>> {
+        if !include_children {
+            return Ok(self.hosts.clone());
+        }
+
+        let mut hosts: Vec<String> = Vec::new();
+        let seen: HashSet<String> = HashSet::new();
+        for descendent in self.get_descendants(groups, true) {
+            let group = groups
+                .get(&descendent)
+                .ok_or(anyhow::format_err!("Could not find {descendent} group"))?;
+            for host in group.get_hosts(groups, false)? {
+                if !seen.contains(&host) {
+                    hosts.push(host.to_string());
+                }
+            }
+        }
+        Ok(hosts)
     }
 
     pub fn set_priority(&mut self, priority: i64) {
@@ -49,6 +69,7 @@ impl Group {
         &self,
         groups: &IndexMap<String, Group>,
         parent: bool,
+        include_self: bool,
     ) -> Vec<String> {
         let mut seen: HashSet<String> = HashSet::new();
         let mut unprocessed: HashSet<String> = if parent {
@@ -56,11 +77,17 @@ impl Group {
         } else {
             HashSet::from_iter(self.child_groups.iter().cloned())
         };
+
         let mut relations: Vec<String> = if parent {
             self.parent_groups.clone()
         } else {
             self.child_groups.clone()
         };
+
+        if include_self {
+            // TODO: make it first on the list
+            relations.push(self.name.to_string());
+        }
 
         while !unprocessed.is_empty() {
             seen.extend(unprocessed.iter().cloned());
@@ -69,7 +96,13 @@ impl Group {
 
             for group_name in &unprocessed {
                 if let Some(group) = groups.get(group_name) {
-                    for parent in &group.parent_groups {
+                    let groups = if parent {
+                        &group.parent_groups
+                    } else {
+                        &group.child_groups
+                    };
+
+                    for parent in groups {
                         // Only add to new_unprocessed if it hasn't already been seen:
                         if !seen.contains(parent) {
                             new_unprocessed.insert(parent.clone());
@@ -88,12 +121,20 @@ impl Group {
         relations
     }
 
-    pub fn get_ancestors(&self, groups: &IndexMap<String, Group>) -> Vec<String> {
-        self.walk_relationships(groups, true)
+    pub fn get_ancestors(
+        &self,
+        groups: &IndexMap<String, Group>,
+        include_self: bool,
+    ) -> Vec<String> {
+        self.walk_relationships(groups, true, include_self)
     }
 
-    pub fn get_descendants(&self, groups: &IndexMap<String, Group>) -> Vec<String> {
-        self.walk_relationships(groups, false)
+    pub fn get_descendants(
+        &self,
+        groups: &IndexMap<String, Group>,
+        include_self: bool,
+    ) -> Vec<String> {
+        self.walk_relationships(groups, false, include_self)
     }
 
     pub fn add_child_group(
@@ -118,8 +159,8 @@ impl Group {
 
         debug!("Adding child group '{child_group_name}' to '{}'", self.name);
 
-        let start_ancestors = child_group.get_ancestors(groups);
-        let mut new_ancestors = self.get_ancestors(groups);
+        let start_ancestors = child_group.get_ancestors(groups, false);
+        let mut new_ancestors = self.get_ancestors(groups, false);
 
         if new_ancestors.contains(&child_group_name.to_string()) {
             bail!("Adding group '{child_group_name}' as child to '{}' creates recursive dependency loop.", self.name);

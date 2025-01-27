@@ -2,7 +2,7 @@ use super::group::Group;
 use super::host::Host;
 use super::yml::parse_yaml_file;
 use crate::constants::LOCALHOST;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use indexmap::IndexMap;
 use log::{debug, warn};
 use regex::Regex;
@@ -81,17 +81,20 @@ impl InventoryManager {
         }
     }
 
-    pub fn filter_hosts(&self, subset: Option<&str>, pattern: &str) -> Result<Vec<Host>> {
+    pub fn filter_hosts(&self, limit: Option<&str>, pattern: &str) -> Result<Vec<Host>> {
         if self.hosts.is_empty() && LOCALHOST.contains(&pattern) {
             warn!("Provided hosts list is empty, only localhost is available. Note that the implicit localhost does not match 'all'");
         }
 
+        let stripped_pattern = pattern.trim_start_matches('\'').trim_end_matches('\'');
+
         let mut combined_patterns = Vec::new();
 
-        combined_patterns.extend(pattern.split(',').map(|p| p.trim().to_string()));
+        combined_patterns.extend(stripped_pattern.split(',').map(|p| p.trim().to_string()));
 
-        if let Some(subset) = subset {
-            combined_patterns.extend(subset.split(',').map(|p| p.trim().to_string()));
+        if let Some(limit) = limit {
+            let stripped_limit = limit.trim_start_matches('\'').trim_end_matches('\'');
+            combined_patterns.extend(stripped_limit.split(',').map(|p| p.trim().to_string()));
         }
 
         // Resolve all patterns, expanding from files where necessary
@@ -105,6 +108,8 @@ impl InventoryManager {
 
         // Apply resolved patterns to filter hosts
         let selected_hosts = self.apply_patterns(resolved_patterns)?;
+
+        // TODO: exclude hosts not in limit
 
         // Map host names to Host objects, filtering out invalid entries
         Ok(selected_hosts
@@ -152,18 +157,71 @@ impl InventoryManager {
         };
 
         let (expr, subscript) = self.split_subscript(stripped_pattern)?;
-        let hosts = self.enumerate_matches(&expr);
-        // TODO: apply subscript to hosts and return
+        let mut hosts = self.enumerate_matches(&expr)?;
+        if let Some((start, end)) = subscript {
+            hosts = self.apply_subscript(&hosts, start, end);
+        }
 
-        Ok(Vec::new())
+        Ok(hosts)
+    }
+
+    fn apply_subscript(&self, hosts: &Vec<String>, start: i32, end: Option<i32>) -> Vec<String> {
+        let len = hosts.len() as i32;
+
+        // Handle negative indexing for `start`
+        let start_idx = if start < 0 { len + start } else { start };
+
+        // If end is not set, use just the `start`
+        if end.is_none() {
+            if start_idx >= 0 && start_idx < len {
+                return vec![hosts[start_idx as usize].clone()];
+            } else {
+                return vec![];
+            }
+        }
+
+        // Handle negative indexing for `end`
+        let end_idx = if let Some(end_val) = end {
+            if end_val < 0 {
+                len + end_val
+            } else {
+                end_val
+            }
+        } else {
+            len
+        };
+
+        if start_idx < 0 || start_idx >= len {
+            return vec![];
+        }
+
+        if end_idx < 0 || end_idx >= len {
+            return vec![];
+        }
+
+        if start_idx >= end_idx {
+            return vec![];
+        }
+
+        hosts[start_idx as usize..=end_idx as usize].to_vec()
     }
 
     fn enumerate_matches(&self, pattern: &str) -> Result<Vec<String>> {
-        //let hosts = Vec::new();
+        let mut hosts = Vec::new();
 
-        let matched_groups = self.match_list(self.groups.keys().cloned().collect(), pattern);
+        let matched_groups = self.match_list(self.groups.keys().cloned().collect(), pattern)?;
+        for group_name in matched_groups {
+            let group = self
+                .groups
+                .get(&group_name)
+                .ok_or(anyhow::format_err!("Could not find {group_name} group"))?;
+            let group_hosts = group.get_hosts(&self.groups, true)?;
+            hosts.extend(group_hosts);
+        }
 
-        Ok(Vec::new())
+        // TODO: process star patterns, like 'azure*'
+
+        Ok(hosts)
     }
 
     fn glob_to_regex(&self, glob: &str) -> Result<String> {
@@ -214,11 +272,11 @@ impl InventoryManager {
         let pattern_with_subscript = Regex::new(
             r"(?x)
             ^
-            (.+)                    # A pattern expression ending with...
+            (.+?)                    # A pattern expression ending with...
             \[(?:                   # A [subscript] expression comprising:
                 (-?[0-9]+)|         # A single positive or negative number
                 ([0-9]*)([:-])      # Or an x:y or x:- range (start can be empty; e.g., :y or :-y).
-                (-?[0-9]*)          # End number (can be empty, can be negative).
+                ([0-9]*)          # End number (can be empty, can be negative).
             )]
             $
         ",
@@ -462,5 +520,150 @@ mod tests {
             .unwrap();
         assert_eq!(parsed_special, "host[*]".to_string());
         assert_eq!(subscript_special, Some((1, None)));
+    }
+
+    #[test]
+    fn test_apply_subscript_single_positive_index() {
+        let inventory_manager = InventoryManager::new();
+        let hosts = vec![
+            "host1".to_string(),
+            "host2".to_string(),
+            "host3".to_string(),
+        ];
+
+        let result = inventory_manager.apply_subscript(&hosts, 1, None);
+        assert_eq!(result, vec!["host2".to_string()]);
+    }
+
+    #[test]
+    fn test_apply_subscript_single_negative_index() {
+        let inventory_manager = InventoryManager::new();
+        let hosts = vec![
+            "host1".to_string(),
+            "host2".to_string(),
+            "host3".to_string(),
+        ];
+
+        let result = inventory_manager.apply_subscript(&hosts, -1, None);
+        assert_eq!(result, vec!["host3".to_string()]);
+    }
+
+    #[test]
+    fn test_apply_subscript_range_positive_indices() {
+        let inventory_manager = InventoryManager::new();
+        let hosts = vec![
+            "host1".to_string(),
+            "host2".to_string(),
+            "host3".to_string(),
+            "host4".to_string(),
+        ];
+
+        let result = inventory_manager.apply_subscript(&hosts, 1, Some(2));
+        assert_eq!(result, vec!["host2".to_string(), "host3".to_string()]);
+    }
+
+    #[test]
+    fn test_apply_subscript_range_negative_indices() {
+        let inventory_manager = InventoryManager::new();
+        let hosts = vec![
+            "host1".to_string(),
+            "host2".to_string(),
+            "host3".to_string(),
+            "host4".to_string(),
+        ];
+
+        let result = inventory_manager.apply_subscript(&hosts, -3, Some(-2));
+        assert_eq!(result, vec!["host2".to_string(), "host3".to_string()]);
+    }
+
+    #[test]
+    fn test_apply_subscript_single_positive_index_out_of_bounds() {
+        let inventory_manager = InventoryManager::new();
+        let hosts = vec!["host1".to_string(), "host2".to_string()];
+
+        let result = inventory_manager.apply_subscript(&hosts, 5, None);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_apply_subscript_negative_index_out_of_bounds() {
+        let inventory_manager = InventoryManager::new();
+        let hosts = vec!["host1".to_string(), "host2".to_string()];
+
+        let result = inventory_manager.apply_subscript(&hosts, -5, None);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_apply_subscript_range_start_greater_than_end() {
+        let inventory_manager = InventoryManager::new();
+        let hosts = vec![
+            "host1".to_string(),
+            "host2".to_string(),
+            "host3".to_string(),
+            "host4".to_string(),
+        ];
+
+        let result = inventory_manager.apply_subscript(&hosts, 2, Some(1));
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_apply_subscript_empty_hosts() {
+        let inventory_manager = InventoryManager::new();
+        let hosts: Vec<String> = vec![];
+
+        let result = inventory_manager.apply_subscript(&hosts, 0, Some(1));
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_apply_subscript_full_range() {
+        let inventory_manager = InventoryManager::new();
+        let hosts = vec![
+            "host1".to_string(),
+            "host2".to_string(),
+            "host3".to_string(),
+            "host4".to_string(),
+        ];
+
+        let result = inventory_manager.apply_subscript(&hosts, 0, Some(3));
+        assert_eq!(
+            result,
+            vec![
+                "host1".to_string(),
+                "host2".to_string(),
+                "host3".to_string(),
+                "host4".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn test_apply_subscript_with_infinite_end() {
+        let inventory_manager = InventoryManager::new();
+        let hosts = vec![
+            "host1".to_string(),
+            "host2".to_string(),
+            "host3".to_string(),
+            "host4".to_string(),
+        ];
+
+        let result = inventory_manager.apply_subscript(&hosts, 2, None);
+        assert_eq!(result, vec!["host3".to_string()]);
+    }
+
+    #[test]
+    fn test_apply_subscript_negative_to_infinite_range() {
+        let inventory_manager = InventoryManager::new();
+        let hosts = vec![
+            "host1".to_string(),
+            "host2".to_string(),
+            "host3".to_string(),
+            "host4".to_string(),
+        ];
+
+        let result = inventory_manager.apply_subscript(&hosts, -2, None);
+        assert_eq!(result, vec!["host3".to_string()]);
     }
 }
