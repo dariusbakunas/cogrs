@@ -1,5 +1,5 @@
 use anyhow::bail;
-use hashbrown::HashMap;
+use indexmap::IndexMap;
 use serde_yaml::Value;
 
 pub type Sequence = Vec<Variable>;
@@ -21,7 +21,7 @@ impl Number {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Mapping {
-    map: HashMap<String, Variable>,
+    map: IndexMap<String, Variable>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -57,7 +57,7 @@ impl TryFrom<&serde_yaml::Value> for Variable {
                 sequence.map(Variable::Sequence)
             }
             Value::Mapping(m) => {
-                let map: Result<HashMap<String, Variable>, _> = m
+                let map: Result<IndexMap<String, Variable>, _> = m
                     .into_iter()
                     .map(|(k, v)| {
                         if let Value::String(key) = k {
@@ -77,7 +77,6 @@ impl TryFrom<&serde_yaml::Value> for Variable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hashbrown::HashMap;
     use serde_yaml::value::{Mapping as YamlMapping, Tag, TaggedValue};
     use serde_yaml::Value;
 
@@ -166,7 +165,7 @@ mod tests {
         let result = Variable::try_from(&value);
         assert!(result.is_ok());
 
-        let mut expected_map = HashMap::new();
+        let mut expected_map = IndexMap::new();
         expected_map.insert("key1".to_string(), Variable::Bool(true));
         expected_map.insert("key2".to_string(), Variable::Number(Number::Int(42)));
 

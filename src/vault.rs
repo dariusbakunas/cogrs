@@ -1,9 +1,8 @@
 pub mod aes256;
 
+use crate::constants::VAULT_HEADER;
 use crate::vault::aes256::AES256;
 use anyhow::{bail, Result};
-
-const B_HEADER: &'static str = "$ANSIBLE_VAULT";
 
 pub struct Vault {}
 
@@ -13,7 +12,7 @@ impl Vault {
     }
 
     pub fn is_encrypted(&self, data: &str) -> bool {
-        data.starts_with(B_HEADER) && data.is_ascii()
+        data.starts_with(VAULT_HEADER) && data.is_ascii()
     }
 
     fn parse_vaulttext_envelope(
@@ -51,7 +50,7 @@ impl Vault {
     }
 
     pub fn decrypt(&self, data: &str, secret: &str) -> Result<String> {
-        let (vault_text, header, version, cipher, vault_id) =
+        let (vault_text, header, version, cipher, _vault_id) =
             self.parse_vaulttext_envelope(data)?;
 
         let plain_text = match cipher.as_str() {
@@ -67,7 +66,6 @@ impl Vault {
 mod tests {
     use super::*;
     use crate::vault::aes256::AES256;
-    use hmac::KeyInit;
 
     fn encrypt_test_data(secret: &str, data: &str) -> Result<String> {
         let encoded_data = AES256::encrypt_aes256(data, secret)?;

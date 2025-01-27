@@ -8,7 +8,7 @@ pub struct Cli {
     config: Option<PathBuf>,
 
     /// outputs a list of matching hosts; does not execute anything else
-    #[arg(short, long, action)]
+    #[arg(long, action)]
     pub list_hosts: bool,
 
     /// the action's options in space separated k=v format: -a 'opt1=val1 opt2=val2' or a json string: -a '{"opt1": "val1", "opt2": "val2"}'
@@ -18,6 +18,10 @@ pub struct Cli {
     /// name of the action to execute
     #[arg(short, long, group = "action")]
     pub module_name: Option<String>,
+
+    /// further limit selected hosts to an additional pattern
+    #[arg(short, long, value_name = "SUBSET")]
+    pub limit: Option<String>,
 
     /// host pattern
     pub pattern: String,

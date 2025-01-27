@@ -1,29 +1,266 @@
 use super::group::Group;
 use super::host::Host;
 use super::yml::parse_yaml_file;
+use crate::constants::LOCALHOST;
 use anyhow::Result;
-use hashbrown::HashMap;
-use log::debug;
+use indexmap::IndexMap;
+use log::{debug, warn};
 use regex::Regex;
 use std::fs;
 use std::path::Path;
 
 pub struct InventoryManager {
-    groups: HashMap<String, Group>,
-    hosts: HashMap<String, Host>,
+    groups: IndexMap<String, Group>,
+    hosts: IndexMap<String, Host>,
 }
 
 impl InventoryManager {
     pub fn new() -> Self {
         InventoryManager {
-            groups: HashMap::new(),
-            hosts: HashMap::new(),
+            groups: IndexMap::new(),
+            hosts: IndexMap::new(),
         }
     }
 
     pub fn list_hosts(&self) -> Vec<Host> {
         let hosts: Vec<Host> = self.hosts.values().cloned().collect();
         hosts
+    }
+
+    fn get_pattern_priority(&self, pattern: &str) -> usize {
+        match pattern.chars().next() {
+            Some('!') => 2, // Exclude patterns get lowest priority
+            Some('&') => 1, // Intersection patterns get medium priority
+            _ => 0,         // Include patterns get highest priority
+        }
+    }
+
+    fn resolve_patterns(&self, patterns: &[String]) -> Vec<String> {
+        let mut resolved_patterns = Vec::new();
+
+        for pattern in patterns {
+            if let Some(file_patterns) = self.read_patterns_from_file(pattern) {
+                resolved_patterns.extend(file_patterns);
+            } else {
+                resolved_patterns.push(pattern.clone());
+            }
+        }
+
+        resolved_patterns
+    }
+
+    fn read_patterns_from_file(&self, pattern: &str) -> Option<Vec<String>> {
+        if !pattern.starts_with('@') {
+            return None;
+        }
+
+        let filename = &pattern[1..];
+        let path = Path::new(filename);
+
+        if !path.exists() || !path.is_file() {
+            warn!(
+                "Pattern '{}' references a file that doesn't exist: {}",
+                pattern, filename
+            );
+            return None;
+        }
+
+        match fs::read_to_string(path) {
+            Ok(content) => {
+                let lines = content
+                    .lines()
+                    .map(|line| line.trim().to_string())
+                    .filter(|line| !line.is_empty())
+                    .collect();
+                Some(lines)
+            }
+            Err(err) => {
+                warn!("Could not read file '{}': {}", filename, err);
+                None
+            }
+        }
+    }
+
+    pub fn filter_hosts(&self, subset: Option<&str>, pattern: &str) -> Result<Vec<Host>> {
+        if self.hosts.is_empty() && LOCALHOST.contains(&pattern) {
+            warn!("Provided hosts list is empty, only localhost is available. Note that the implicit localhost does not match 'all'");
+        }
+
+        let mut combined_patterns = Vec::new();
+
+        combined_patterns.extend(pattern.split(',').map(|p| p.trim().to_string()));
+
+        if let Some(subset) = subset {
+            combined_patterns.extend(subset.split(',').map(|p| p.trim().to_string()));
+        }
+
+        // Resolve all patterns, expanding from files where necessary
+        let mut resolved_patterns = self.resolve_patterns(&combined_patterns);
+
+        // Sort resolved patterns by priority
+        resolved_patterns.sort_by(|a, b| {
+            self.get_pattern_priority(a)
+                .cmp(&self.get_pattern_priority(b))
+        });
+
+        // Apply resolved patterns to filter hosts
+        let selected_hosts = self.apply_patterns(resolved_patterns)?;
+
+        // Map host names to Host objects, filtering out invalid entries
+        Ok(selected_hosts
+            .iter()
+            .filter_map(|host| self.hosts.get(host).cloned())
+            .collect())
+    }
+
+    fn apply_patterns(&self, patterns: Vec<String>) -> Result<Vec<String>> {
+        let mut selected_hosts = Vec::new();
+
+        for pattern in patterns {
+            let matched_hosts = self.match_single_pattern(&pattern)?;
+
+            if pattern.starts_with('!') {
+                // Exclude hosts matching the pattern
+                selected_hosts = selected_hosts
+                    .into_iter()
+                    .filter(|host| !matched_hosts.contains(host))
+                    .collect();
+            } else if pattern.starts_with('&') {
+                // Retain only hosts that match the intersection pattern
+                selected_hosts = selected_hosts
+                    .into_iter()
+                    .filter(|host| matched_hosts.contains(host))
+                    .collect();
+            } else {
+                // Add hosts that match the pattern, avoiding duplicates
+                for host in matched_hosts {
+                    if !selected_hosts.contains(&host) {
+                        selected_hosts.push(host);
+                    }
+                }
+            }
+        }
+
+        Ok(selected_hosts)
+    }
+
+    fn match_single_pattern(&self, pattern: &str) -> Result<Vec<String>> {
+        let stripped_pattern = if pattern.starts_with('!') || pattern.starts_with('&') {
+            &pattern[1..]
+        } else {
+            pattern
+        };
+
+        let (expr, subscript) = self.split_subscript(stripped_pattern)?;
+        let hosts = self.enumerate_matches(&expr);
+        // TODO: apply subscript to hosts and return
+
+        Ok(Vec::new())
+    }
+
+    fn enumerate_matches(&self, pattern: &str) -> Result<Vec<String>> {
+        //let hosts = Vec::new();
+
+        let matched_groups = self.match_list(self.groups.keys().cloned().collect(), pattern);
+
+        Ok(Vec::new())
+    }
+
+    fn glob_to_regex(&self, glob: &str) -> Result<String> {
+        let mut regex = String::from("^");
+        for ch in glob.chars() {
+            match ch {
+                '*' => regex.push_str(".*"),
+                '?' => regex.push('.'),
+                '.' | '\\' | '+' | '(' | ')' | '|' | '^' | '$' | '[' | ']' | '{' | '}' => {
+                    regex.push('\\');
+                    regex.push(ch);
+                }
+                _ => regex.push(ch),
+            }
+        }
+        regex.push('$');
+        Ok(regex)
+    }
+
+    fn match_list(&self, items: Vec<String>, pattern_str: &str) -> Result<Vec<String>> {
+        // Compile patterns
+        let pattern = if !pattern_str.starts_with('~') {
+            Regex::new(&self.glob_to_regex(pattern_str)?)?
+        } else {
+            Regex::new(&pattern_str[1..])?
+        };
+
+        // Apply patterns
+        let results: Vec<String> = items
+            .iter()
+            .filter(|item| pattern.is_match(item))
+            .cloned()
+            .collect();
+
+        Ok(results)
+    }
+
+    /// Takes a pattern, checks if it has a subscript, and returns the pattern
+    /// without the subscript and a (start,end) tuple representing the given
+    /// subscript (or None if there is no subscript).
+    fn split_subscript(&self, pattern: &str) -> Result<(String, Option<(i32, Option<i32>)>)> {
+        // Do not parse regexes for enumeration info
+        if pattern.starts_with('~') {
+            return Ok((pattern.to_string(), None));
+        }
+
+        // Compiling the regex for pattern with subscript
+        let pattern_with_subscript = Regex::new(
+            r"(?x)
+            ^
+            (.+)                    # A pattern expression ending with...
+            \[(?:                   # A [subscript] expression comprising:
+                (-?[0-9]+)|         # A single positive or negative number
+                ([0-9]*)([:-])      # Or an x:y or x:- range (start can be empty; e.g., :y or :-y).
+                (-?[0-9]*)          # End number (can be empty, can be negative).
+            )]
+            $
+        ",
+        )?;
+
+        // Using the regex to validate and parse the input pattern
+        if let Some(captures) = pattern_with_subscript.captures(pattern) {
+            let trimmed_pattern = captures.get(1).map_or("", |m| m.as_str()).to_string();
+
+            if let Some(idx_match) = captures.get(2) {
+                let idx = idx_match.as_str().parse::<i32>().unwrap();
+                return Ok((trimmed_pattern, Some((idx, None))));
+            } else {
+                let start = captures.get(3).map_or(0, |start_str| {
+                    let s = start_str.as_str();
+                    if s.is_empty() {
+                        0
+                    } else {
+                        s.parse::<i32>().unwrap_or(0)
+                    }
+                });
+
+                let sep = captures.get(4).map_or(":", |m| m.as_str());
+
+                let end = captures.get(5).map_or(-1, |end_str| {
+                    let s = end_str.as_str();
+                    if s.is_empty() {
+                        -1
+                    } else {
+                        s.parse::<i32>().unwrap_or(-1)
+                    }
+                });
+
+                if sep == "-" {
+                    println!("Warning: Use [x:y] inclusive subscripts instead of [x-y], which has been removed.");
+                }
+
+                return Ok((trimmed_pattern, Some((start, Some(end)))));
+            }
+        }
+
+        Ok((pattern.to_string(), None))
     }
 
     pub fn list_groups(&self) -> Vec<Group> {
@@ -107,5 +344,123 @@ impl InventoryManager {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use regex::Regex;
+
+    #[test]
+    fn test_split_subscript_no_subscript() {
+        let inventory_manager = InventoryManager::new();
+
+        let input_pattern = "pattern_without_subscript";
+        let (parsed_pattern, subscript) = inventory_manager.split_subscript(input_pattern).unwrap();
+
+        assert_eq!(parsed_pattern, input_pattern.to_string());
+        assert!(subscript.is_none());
+    }
+
+    #[test]
+    fn test_split_subscript_with_single_index_subscript() {
+        let inventory_manager = InventoryManager::new();
+
+        let input_pattern = "host[3]";
+        let (parsed_pattern, subscript) = inventory_manager.split_subscript(input_pattern).unwrap();
+
+        assert_eq!(parsed_pattern, "host".to_string());
+        assert_eq!(subscript, Some((3, None)));
+    }
+
+    #[test]
+    fn test_split_subscript_with_positive_range_subscript() {
+        let inventory_manager = InventoryManager::new();
+
+        let input_pattern = "host[1:4]";
+        let (parsed_pattern, subscript) = inventory_manager.split_subscript(input_pattern).unwrap();
+
+        assert_eq!(parsed_pattern, "host".to_string());
+        assert_eq!(subscript, Some((1, Some(4))));
+    }
+
+    #[test]
+    fn test_split_subscript_with_negative_index() {
+        let inventory_manager = InventoryManager::new();
+
+        let input_pattern = "host[-2]";
+        let (parsed_pattern, subscript) = inventory_manager.split_subscript(input_pattern).unwrap();
+
+        assert_eq!(parsed_pattern, "host".to_string());
+        assert_eq!(subscript, Some((-2, None)));
+    }
+
+    #[test]
+    fn test_split_subscript_with_positive_to_infinite_range() {
+        let inventory_manager = InventoryManager::new();
+
+        let input_pattern = "host[5:]";
+        let (parsed_pattern, subscript) = inventory_manager.split_subscript(input_pattern).unwrap();
+
+        assert_eq!(parsed_pattern, "host".to_string());
+        assert_eq!(subscript, Some((5, Some(-1))));
+    }
+
+    #[test]
+    fn test_split_subscript_with_infinite_to_negative_end_range() {
+        let inventory_manager = InventoryManager::new();
+
+        let input_pattern = "host[:-3]";
+        let (parsed_pattern, subscript) = inventory_manager.split_subscript(input_pattern).unwrap();
+
+        assert_eq!(parsed_pattern, "host".to_string());
+        assert_eq!(subscript, Some((0, Some(-3))));
+    }
+
+    #[test]
+    fn test_split_subscript_with_invalid_pattern() {
+        let inventory_manager = InventoryManager::new();
+
+        let input_pattern = "host[invalid]";
+        let (parsed_pattern, subscript) = inventory_manager.split_subscript(input_pattern).unwrap();
+
+        // In case of an invalid pattern, the function should return the full pattern unchanged,
+        // and subscript should be None.
+        assert_eq!(parsed_pattern, input_pattern.to_string());
+        assert!(subscript.is_none());
+    }
+
+    #[test]
+    fn test_split_subscript_with_regex_flag() {
+        let inventory_manager = InventoryManager::new();
+
+        let input_pattern = "~host_regex[3]";
+        let (parsed_pattern, subscript) = inventory_manager.split_subscript(input_pattern).unwrap();
+
+        // Regex patterns are not subjected to parsing for subscripts and remain intact.
+        assert_eq!(parsed_pattern, input_pattern.to_string());
+        assert!(subscript.is_none());
+    }
+
+    #[test]
+    fn test_split_subscript_edge_cases() {
+        let inventory_manager = InventoryManager::new();
+
+        // Empty input
+        let input_pattern_empty = "";
+        let (parsed_empty, subscript_empty) = inventory_manager
+            .split_subscript(input_pattern_empty)
+            .unwrap();
+        assert_eq!(parsed_empty, "".to_string());
+        assert!(subscript_empty.is_none());
+
+        // Special characters in pattern
+        let input_pattern_special = "host[*][1]";
+        let (parsed_special, subscript_special) = inventory_manager
+            .split_subscript(input_pattern_special)
+            .unwrap();
+        assert_eq!(parsed_special, "host[*]".to_string());
+        assert_eq!(subscript_special, Some((1, None)));
     }
 }

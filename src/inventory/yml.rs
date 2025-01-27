@@ -3,7 +3,7 @@ use super::host::Host;
 use super::utils::parse_host_pattern;
 use crate::inventory::vars::Variable;
 use anyhow::{bail, Result};
-use hashbrown::HashMap;
+use indexmap::IndexMap;
 use log::{debug, error, info, warn};
 use serde_yaml;
 use serde_yaml::Value;
@@ -23,8 +23,8 @@ fn get_value_type(val: &Value) -> &str {
 
 pub fn parse_yaml_file(
     file_path: &Path,
-    groups: &mut HashMap<String, Group>,
-    hosts: &mut HashMap<String, Host>,
+    groups: &mut IndexMap<String, Group>,
+    hosts: &mut IndexMap<String, Host>,
 ) -> Result<()> {
     let file = std::fs::File::open(file_path)?;
     let data: Value = serde_yaml::from_reader(file)?;
@@ -58,8 +58,8 @@ pub fn parse_yaml_file(
 fn parse_group(
     group_name: &str,
     data: &serde_yaml::Mapping,
-    groups: &mut HashMap<String, Group>,
-    hosts: &mut HashMap<String, Host>,
+    groups: &mut IndexMap<String, Group>,
+    hosts: &mut IndexMap<String, Host>,
 ) -> anyhow::Result<()> {
     debug!("Parsing {group_name} group");
 
@@ -83,14 +83,15 @@ fn parse_group(
         }
 
         if let Some(parent_group_name) = parent_group_name {
-            let [Some(parent_group), Some(child_group)] =
-                groups.get_many_mut([&parent_group_name, &current_group_name])
-            else {
-                anyhow::bail!("Parent group {parent_group_name} or child group {current_group_name} does not exist in the provided groups collection")
-            };
+            let mut parent_group = groups
+                .get(&parent_group_name)
+                .ok_or(anyhow::format_err!("Parent group {parent_group_name} does not exist in the provided groups collection"))?
+                .clone();
 
-            let mut parent_group = parent_group.clone();
-            let mut child_group = child_group.clone();
+            let mut child_group = groups
+                .get(&current_group_name)
+                .ok_or(anyhow::format_err!("Child group {current_group_name} does not exist in the provided groups collection"))?
+                .clone();
 
             parent_group.add_child_group(&mut child_group, groups, hosts)?;
 
@@ -131,7 +132,7 @@ fn parse_group_vars(group: &mut Group, val: &Value) -> Result<()> {
 fn parse_group_hosts(
     group: &mut Group,
     val: &Value,
-    hosts: &mut HashMap<String, Host>,
+    hosts: &mut IndexMap<String, Host>,
 ) -> anyhow::Result<()> {
     if let Value::Mapping(val) = val {
         for (host_key, _) in val {

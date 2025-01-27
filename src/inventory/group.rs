@@ -2,7 +2,7 @@ use crate::inventory::host::Host;
 use crate::inventory::utils::difference_update_vec;
 use crate::inventory::vars::Variable;
 use anyhow::{bail, Result};
-use hashbrown::HashMap;
+use indexmap::IndexMap;
 use log::{debug, warn};
 use std::collections::HashSet;
 
@@ -11,7 +11,7 @@ pub struct Group {
     pub name: String,
     depth: u32,
     priority: i64,
-    vars: HashMap<String, Variable>,
+    vars: IndexMap<String, Variable>,
     hosts: Vec<String>,
     pub child_groups: Vec<String>,
     parent_groups: Vec<String>,
@@ -23,7 +23,7 @@ impl Group {
             name: name.to_string(),
             depth: 0,
             priority: 1,
-            vars: HashMap::new(),
+            vars: IndexMap::new(),
             hosts: Vec::new(),
             child_groups: Vec::new(),
             parent_groups: Vec::new(),
@@ -45,7 +45,11 @@ impl Group {
         self.priority = priority;
     }
 
-    pub fn walk_relationships(&self, groups: &HashMap<String, Group>, parent: bool) -> Vec<String> {
+    pub fn walk_relationships(
+        &self,
+        groups: &IndexMap<String, Group>,
+        parent: bool,
+    ) -> Vec<String> {
         let mut seen: HashSet<String> = HashSet::new();
         let mut unprocessed: HashSet<String> = if parent {
             HashSet::from_iter(self.parent_groups.iter().cloned())
@@ -84,19 +88,19 @@ impl Group {
         relations
     }
 
-    pub fn get_ancestors(&self, groups: &HashMap<String, Group>) -> Vec<String> {
+    pub fn get_ancestors(&self, groups: &IndexMap<String, Group>) -> Vec<String> {
         self.walk_relationships(groups, true)
     }
 
-    pub fn get_descendants(&self, groups: &HashMap<String, Group>) -> Vec<String> {
+    pub fn get_descendants(&self, groups: &IndexMap<String, Group>) -> Vec<String> {
         self.walk_relationships(groups, false)
     }
 
     pub fn add_child_group(
         &mut self,
         child_group: &mut Group,
-        groups: &mut HashMap<String, Group>,
-        hosts: &mut HashMap<String, Host>,
+        groups: &mut IndexMap<String, Group>,
+        hosts: &mut IndexMap<String, Host>,
     ) -> Result<()> {
         let child_group_name = &child_group.name;
 
@@ -178,7 +182,7 @@ impl Group {
         }
     }
 
-    fn check_children_depth(&self, groups: &mut HashMap<String, Group>) -> Result<()> {
+    fn check_children_depth(&self, groups: &mut IndexMap<String, Group>) -> Result<()> {
         let mut seen: HashSet<String> = HashSet::new();
         let mut unprocessed: HashSet<String> =
             HashSet::from_iter(self.parent_groups.iter().cloned());
