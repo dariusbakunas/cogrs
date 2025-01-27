@@ -7,5 +7,5 @@ Toy project to learn Rust and also make a simple CLI that behaves similarly to a
 ## Examples
 
 ```bash
-$ cogrs -m "shell" -a "ls -al" -i ./inventory.yml workers
+$ cogrs ../ansible-playground/inventory --list-hosts 'azure, k8s' --limit 'mysql_a,mysql_b,control?.local*[0]'
 ```
