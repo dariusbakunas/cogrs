@@ -2,10 +2,11 @@ use super::group::Group;
 use super::host::Host;
 use super::yml::parse_yaml_file;
 use crate::constants::LOCALHOST;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use indexmap::IndexMap;
 use log::{debug, warn};
 use regex::Regex;
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
@@ -107,9 +108,21 @@ impl InventoryManager {
         });
 
         // Apply resolved patterns to filter hosts
-        let selected_hosts = self.apply_patterns(resolved_patterns)?;
+        let mut selected_hosts = self.apply_patterns(resolved_patterns)?;
 
-        // TODO: exclude hosts not in limit
+        if let Some(limit) = limit {
+            let patterns: Vec<String> = limit.split(',').map(|p| p.trim().to_string()).collect();
+            let resolved_patterns = self.resolve_patterns(&patterns);
+            let limit_hosts = self.apply_patterns(resolved_patterns)?;
+            let limit_host_set: HashSet<String> = limit_hosts.into_iter().collect();
+
+            selected_hosts = selected_hosts
+                .into_iter()
+                .filter(|host| limit_host_set.contains(host))
+                .collect();
+        }
+
+        // TODO: handle localhost and all
 
         // Map host names to Host objects, filtering out invalid entries
         Ok(selected_hosts
@@ -210,16 +223,23 @@ impl InventoryManager {
         let mut hosts = Vec::new();
 
         let matched_groups = self.match_list(self.groups.keys().cloned().collect(), pattern)?;
-        for group_name in matched_groups {
+        for group_name in &matched_groups {
             let group = self
                 .groups
-                .get(&group_name)
+                .get(group_name)
                 .ok_or(anyhow::format_err!("Could not find {group_name} group"))?;
             let group_hosts = group.get_hosts(&self.groups, true)?;
             hosts.extend(group_hosts);
         }
 
-        // TODO: process star patterns, like 'azure*'
+        let special_chars = ['.', '?', '*', '['];
+        if matched_groups.is_empty()
+            || pattern.starts_with("~")
+            || pattern.chars().any(|c| special_chars.contains(&c))
+        {
+            let matched_hosts = self.match_list(self.hosts.keys().cloned().collect(), pattern)?;
+            hosts.extend(matched_hosts);
+        }
 
         Ok(hosts)
     }
