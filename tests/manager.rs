@@ -21,10 +21,11 @@ fn validate_groups(inventory_manager: &InventoryManager, expected_groups: &[&str
 
 fn validate_hosts(
     inventory_manager: &InventoryManager,
-    filter: &str,
+    pattern: &str,
+    limit: Option<&str>,
     expected_hosts: &[&str],
 ) -> Result<()> {
-    let hosts = inventory_manager.filter_hosts(filter, None)?;
+    let hosts = inventory_manager.filter_hosts(pattern, limit)?;
     assert_eq!(hosts.len(), expected_hosts.len());
     for (i, &expected_host) in expected_hosts.iter().enumerate() {
         assert_eq!(hosts[i].name, expected_host);
@@ -46,6 +47,7 @@ fn test_basic_inventory_no_limits() -> Result<()> {
     validate_hosts(
         &inventory_manager,
         "all",
+        None,
         &[
             "mail.example.com",
             "foo.example.com",
@@ -60,6 +62,7 @@ fn test_basic_inventory_no_limits() -> Result<()> {
     validate_hosts(
         &inventory_manager,
         "webservers",
+        None,
         &["foo.example.com", "bar.example.com"],
     )?;
 
@@ -88,6 +91,7 @@ fn test_basic_relationships_no_limits() -> Result<()> {
     validate_hosts(
         &inventory_manager,
         "all",
+        None,
         &[
             "mail.example.com",
             "foo.example.com",
@@ -101,6 +105,7 @@ fn test_basic_relationships_no_limits() -> Result<()> {
     validate_hosts(
         &inventory_manager,
         "prod",
+        None,
         &["foo.example.com", "one.example.com"],
     )?;
 
