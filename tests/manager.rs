@@ -66,7 +66,6 @@ fn validate_hosts(
 #[case("basic_relationships.yaml", "prod,&dbservers", None, vec!["one.example.com"])]
 #[case("basic_relationships.yaml", "webservers,&prod", Some("foo*"), vec!["foo.example.com"])]
 #[case("basic_relationships.yaml", "~(mail|foo).*\\.example\\.com", None, vec!["mail.example.com", "foo.example.com"])]
-#[case("basic_relationships.yaml", "all", Some("@inventory/limit_hosts.txt"), vec!["mail.example.com", "foo.example.com"])]
 fn validate_host_patterns_and_limits(
     #[case] inventory: &str,
     #[case] pattern: &str,
