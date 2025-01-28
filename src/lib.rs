@@ -17,7 +17,7 @@ pub fn run() -> Result<()> {
 
     if cli.list_hosts {
         let mut hosts: Vec<String> = manager
-            .filter_hosts(cli.limit.as_deref(), cli.pattern.as_str())?
+            .filter_hosts(cli.pattern.as_str(), cli.limit.as_deref())?
             .iter()
             .map(|h| h.name.to_string())
             .collect();

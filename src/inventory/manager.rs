@@ -82,7 +82,7 @@ impl InventoryManager {
             .collect())
     }
 
-    pub fn filter_hosts(&self, limit: Option<&str>, pattern: &str) -> Result<Vec<Host>> {
+    pub fn filter_hosts(&self, pattern: &str, limit: Option<&str>) -> Result<Vec<Host>> {
         if self.hosts.is_empty() && LOCALHOST.contains(&pattern) {
             warn!("Provided hosts list is empty, only localhost is available. Note that the implicit localhost does not match 'all'");
         }
