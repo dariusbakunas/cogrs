@@ -66,6 +66,7 @@ fn validate_hosts(
 #[case("basic_relationships.yaml", "prod,&dbservers", None, vec!["one.example.com"])]
 #[case("basic_relationships.yaml", "webservers,&prod", Some("foo*"), vec!["foo.example.com"])]
 #[case("basic_relationships.yaml", "~(mail|foo).*\\.example\\.com", None, vec!["mail.example.com", "foo.example.com"])]
+#[case("basic_relationships.yaml", "all", Some("@inventory/limit_hosts.txt"), vec!["mail.example.com", "foo.example.com"])]
 fn validate_host_patterns_and_limits(
     #[case] inventory: &str,
     #[case] pattern: &str,
@@ -79,6 +80,22 @@ fn validate_host_patterns_and_limits(
         pattern,
         limit,
         expected_hosts.as_slice(),
+    )?;
+
+    Ok(())
+}
+
+#[test]
+fn load_patterns_from_file_test() -> Result<()> {
+    let inventory_manager = setup_inventory_manager("basic_relationships.yaml").unwrap();
+    let pattern_file =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/inventory/limit_hosts.txt");
+    validate_hosts(
+        &inventory_manager,
+        "basic_relationships.yaml",
+        "all",
+        Some(format!("@{}", pattern_file.to_str().unwrap()).as_str()),
+        &vec!["foo.example.com", "three.example.com"],
     )?;
 
     Ok(())
