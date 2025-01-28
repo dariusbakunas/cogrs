@@ -53,11 +53,16 @@ fn validate_hosts(
 #[case("basic.yaml", "dbservers", None, vec!["one.example.com", "two.example.com", "three.example.com"])]
 #[case("basic.yaml", "webservers", Some("bar*"), vec!["bar.example.com"])]
 #[case("basic.yaml", "dbservers", Some("!two.example.com"), vec!["one.example.com", "three.example.com"])]
+#[case("basic.yaml", "two.example.com", None, vec!["two.example.com"])]
+#[case("basic.yaml", "dbservers[0:1]", None, vec!["one.example.com", "two.example.com"])]
+#[case("basic_relationships.yaml", "one.example.com, two.example.com", Some("east"), vec!["one.example.com"])]
 #[case("basic_relationships.yaml", "all", None, vec!["mail.example.com", "foo.example.com", "bar.example.com", "one.example.com", "three.example.com"])]
 #[case("basic_relationships.yaml", "all", Some("foo*, bar*"), vec!["foo.example.com", "bar.example.com"])]
 #[case("basic_relationships.yaml", "prod", None, vec!["foo.example.com", "one.example.com"])]
 #[case("basic_relationships.yaml", "prod", Some("!webservers"), vec!["one.example.com"])]
 #[case("basic_relationships.yaml", "all", Some("webservers[-1], prod[1]"), vec!["bar.example.com", "one.example.com"])]
+#[case("basic_relationships.yaml", "prod,&dbservers", None, vec!["one.example.com"])]
+#[case("basic_relationships.yaml", "webservers,&prod", Some("foo*"), vec!["foo.example.com"])]
 fn validate_host_patterns_and_limits(
     #[case] inventory: &str,
     #[case] pattern: &str,

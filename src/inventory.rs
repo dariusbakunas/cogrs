@@ -7,7 +7,6 @@ pub mod utils;
 pub mod vars;
 pub mod yml;
 
-use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
 pub fn merge_yaml_values(a: &mut Value, b: Value) {

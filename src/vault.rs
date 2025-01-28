@@ -50,7 +50,7 @@ impl Vault {
     }
 
     pub fn decrypt(&self, data: &str, secret: &str) -> Result<String> {
-        let (vault_text, header, version, cipher, _vault_id) =
+        let (vault_text, _header, _version, cipher, _vault_id) =
             self.parse_vaulttext_envelope(data)?;
 
         let plain_text = match cipher.as_str() {
