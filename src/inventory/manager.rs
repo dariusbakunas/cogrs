@@ -2,16 +2,14 @@ use super::group::Group;
 use super::host::Host;
 use crate::constants::LOCALHOST;
 use crate::inventory::parser::InventoryParser;
+use crate::inventory::patterns::PatternResolver;
 use crate::inventory::utils::{glob_to_regex, split_subscript};
 use anyhow::Result;
 use indexmap::IndexMap;
 use log::warn;
 use regex::Regex;
 use std::collections::HashSet;
-use std::fs;
-use std::path::Path;
 
-pub struct PatternResolver;
 pub struct HostManager;
 
 pub struct InventoryManager {
@@ -37,65 +35,6 @@ impl InventoryManager {
         Ok(())
     }
 
-    pub fn list_hosts(&self) -> Vec<Host> {
-        let hosts: Vec<Host> = self.hosts.values().cloned().collect();
-        hosts
-    }
-
-    fn get_pattern_priority(&self, pattern: &str) -> usize {
-        match pattern.chars().next() {
-            Some('!') => 2, // Exclude patterns get lowest priority
-            Some('&') => 1, // Intersection patterns get medium priority
-            _ => 0,         // Include patterns get highest priority
-        }
-    }
-
-    fn resolve_patterns(&self, patterns: &[String]) -> Vec<String> {
-        let mut resolved_patterns = Vec::new();
-
-        for pattern in patterns {
-            if let Some(file_patterns) = self.read_patterns_from_file(pattern) {
-                resolved_patterns.extend(file_patterns);
-            } else {
-                resolved_patterns.push(pattern.clone());
-            }
-        }
-
-        resolved_patterns
-    }
-
-    fn read_patterns_from_file(&self, pattern: &str) -> Option<Vec<String>> {
-        if !pattern.starts_with('@') {
-            return None;
-        }
-
-        let filename = &pattern[1..];
-        let path = Path::new(filename);
-
-        if !path.exists() || !path.is_file() {
-            warn!(
-                "Pattern '{}' references a file that doesn't exist: {}",
-                pattern, filename
-            );
-            return None;
-        }
-
-        match fs::read_to_string(path) {
-            Ok(content) => {
-                let lines = content
-                    .lines()
-                    .map(|line| line.trim().to_string())
-                    .filter(|line| !line.is_empty())
-                    .collect();
-                Some(lines)
-            }
-            Err(err) => {
-                warn!("Could not read file '{}': {}", filename, err);
-                None
-            }
-        }
-    }
-
     fn get_combined_patterns(&self, limit: Option<&str>, pattern: &str) -> Vec<String> {
         let stripped_pattern = pattern.trim_start_matches('\'').trim_end_matches('\'');
         let mut combined_patterns: Vec<String> = stripped_pattern
@@ -111,18 +50,9 @@ impl InventoryManager {
         combined_patterns
     }
 
-    fn resolve_and_sort_patterns(&self, patterns: &[String]) -> Vec<String> {
-        let mut resolved_patterns = self.resolve_patterns(patterns);
-        resolved_patterns.sort_by(|a, b| {
-            self.get_pattern_priority(a)
-                .cmp(&self.get_pattern_priority(b))
-        });
-        resolved_patterns
-    }
-
     fn filter_with_limit(&self, selected_hosts: Vec<String>, limit: &str) -> Result<Vec<String>> {
         let patterns: Vec<String> = limit.split(',').map(|p| p.trim().to_string()).collect();
-        let resolved_limit_patterns = self.resolve_patterns(&patterns);
+        let resolved_limit_patterns = PatternResolver::resolve_patterns(&patterns);
 
         let limit_hosts = self.apply_patterns(resolved_limit_patterns)?;
         let limit_host_set: HashSet<String> = limit_hosts.into_iter().collect();
@@ -141,7 +71,7 @@ impl InventoryManager {
         let combined_patterns = self.get_combined_patterns(limit, pattern);
 
         // Resolve all patterns, expanding from files where necessary
-        let resolved_patterns = self.resolve_and_sort_patterns(&combined_patterns);
+        let resolved_patterns = PatternResolver::resolve_and_sort_patterns(&combined_patterns);
 
         // Apply resolved patterns to filter hosts
         let mut selected_hosts = self.apply_patterns(resolved_patterns)?;
