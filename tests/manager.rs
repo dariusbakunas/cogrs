@@ -1,5 +1,6 @@
 use anyhow::Result;
 use cogrs::inventory::manager::InventoryManager;
+use rstest::rstest;
 use std::path::PathBuf;
 
 fn setup_inventory_manager(inventory_file: &str) -> Result<InventoryManager> {
@@ -44,35 +45,36 @@ fn validate_hosts(
     Ok(())
 }
 
+#[rstest]
+#[case("all", None, vec!["mail.example.com", "foo.example.com", "bar.example.com", "one.example.com", "two.example.com", "three.example.com"])]
+#[case("webservers", None, vec!["foo.example.com", "bar.example.com"])]
+#[case("dbservers", None, vec!["one.example.com", "two.example.com", "three.example.com"])]
+#[case("webservers", Some("bar*"), vec!["bar.example.com"])]
+#[case("dbservers", Some("!two.example.com"), vec!["one.example.com", "three.example.com"])]
+fn validate_basic_inventory_hosts(
+    #[case] pattern: &str,
+    #[case] limit: Option<&str>,
+    #[case] expected_hosts: Vec<&str>,
+) -> Result<()> {
+    let inventory_manager = setup_inventory_manager("basic.yaml").unwrap();
+    validate_hosts(
+        &inventory_manager,
+        pattern,
+        limit,
+        expected_hosts.as_slice(),
+    )?;
+
+    Ok(())
+}
+
 #[test]
-fn test_basic_inventory_no_limits() -> Result<()> {
+fn validate_basic_inventory_groups() -> Result<()> {
     let inventory_manager = setup_inventory_manager("basic.yaml")?;
 
     validate_groups(
         &inventory_manager,
         &["ungrouped", "webservers", "dbservers"],
     );
-
-    validate_hosts(
-        &inventory_manager,
-        "all",
-        None,
-        &[
-            "mail.example.com",
-            "foo.example.com",
-            "bar.example.com",
-            "one.example.com",
-            "two.example.com",
-            "three.example.com",
-        ],
-    )?;
-
-    validate_hosts(
-        &inventory_manager,
-        "webservers",
-        None,
-        &["foo.example.com", "bar.example.com"],
-    )?;
 
     Ok(())
 }
