@@ -13,9 +13,13 @@ fn setup_inventory_manager(inventory_file: &str) -> Result<InventoryManager> {
 
 fn validate_groups(inventory_manager: &InventoryManager, expected_groups: &[&str]) {
     let groups = inventory_manager.list_groups();
-    assert_eq!(groups.len(), expected_groups.len());
-    for (i, &expected_group) in expected_groups.iter().enumerate() {
-        assert_eq!(groups[i].name, expected_group);
+    let actual_names: Vec<String> = groups.iter().map(|g| g.name.clone()).collect();
+
+    if actual_names != expected_groups {
+        panic!(
+            "Group mismatch:\n  Expected: {:?}\n  Found:    {:?}",
+            expected_groups, actual_names
+        );
     }
 }
 
@@ -26,9 +30,16 @@ fn validate_hosts(
     expected_hosts: &[&str],
 ) -> Result<()> {
     let hosts = inventory_manager.filter_hosts(pattern, limit)?;
-    assert_eq!(hosts.len(), expected_hosts.len());
-    for (i, &expected_host) in expected_hosts.iter().enumerate() {
-        assert_eq!(hosts[i].name, expected_host);
+    let actual_names: Vec<String> = hosts.iter().map(|h| h.name.clone()).collect();
+
+    if actual_names != expected_hosts {
+        panic!(
+            "Host mismatch for pattern '{}', limit: '{}':\n  Expected: {:?}\n  Found:    {:?}",
+            pattern,
+            limit.unwrap_or("None"),
+            expected_hosts,
+            actual_names
+        );
     }
     Ok(())
 }
@@ -37,13 +48,11 @@ fn validate_hosts(
 fn test_basic_inventory_no_limits() -> Result<()> {
     let inventory_manager = setup_inventory_manager("basic.yaml")?;
 
-    // Validate groups
     validate_groups(
         &inventory_manager,
         &["ungrouped", "webservers", "dbservers"],
     );
 
-    // Validate hosts without limits
     validate_hosts(
         &inventory_manager,
         "all",
@@ -58,7 +67,6 @@ fn test_basic_inventory_no_limits() -> Result<()> {
         ],
     )?;
 
-    // Validate webservers group hosts
     validate_hosts(
         &inventory_manager,
         "webservers",
@@ -70,10 +78,37 @@ fn test_basic_inventory_no_limits() -> Result<()> {
 }
 
 #[test]
+fn test_basic_relationships_with_limits() -> Result<()> {
+    let inventory_manager = setup_inventory_manager("basic_relationships.yaml")?;
+
+    validate_hosts(
+        &inventory_manager,
+        "all",
+        Some("foo*,bar*"),
+        &["foo.example.com", "bar.example.com"],
+    )?;
+
+    validate_hosts(
+        &inventory_manager,
+        "prod",
+        Some("!webservers"),
+        &["one.example.com"],
+    )?;
+
+    validate_hosts(
+        &inventory_manager,
+        "all",
+        Some("webservers[-1], prod[1]"),
+        &["bar.example.com", "one.example.com"],
+    )?;
+
+    Ok(())
+}
+
+#[test]
 fn test_basic_relationships_no_limits() -> Result<()> {
     let inventory_manager = setup_inventory_manager("basic_relationships.yaml")?;
 
-    // Validate groups
     validate_groups(
         &inventory_manager,
         &[
@@ -87,7 +122,6 @@ fn test_basic_relationships_no_limits() -> Result<()> {
         ],
     );
 
-    // Validate hosts without limits
     validate_hosts(
         &inventory_manager,
         "all",
@@ -101,7 +135,6 @@ fn test_basic_relationships_no_limits() -> Result<()> {
         ],
     )?;
 
-    // Validate prod hosts
     validate_hosts(
         &inventory_manager,
         "prod",
