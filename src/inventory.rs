@@ -9,17 +9,6 @@ pub mod yml;
 
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
-use std::collections::HashMap;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct HostGroup {
-    hosts: Option<HashMap<String, Value>>,
-    vars: Option<HashMap<String, Value>>,
-}
-
-pub struct DataLoader {}
-
-struct VariableManager {}
 
 pub fn merge_yaml_values(a: &mut Value, b: Value) {
     if b.is_null() {

@@ -15,14 +15,28 @@ pub struct HostManager;
 pub struct InventoryManager {
     groups: IndexMap<String, Group>,
     hosts: IndexMap<String, Host>,
+    localhost: Host,
 }
 
 impl InventoryManager {
     pub fn new() -> Self {
+        let localhost = Host::new("localhost");
+
         InventoryManager {
             groups: IndexMap::new(),
             hosts: IndexMap::new(),
+            localhost,
         }
+    }
+
+    pub fn get_host(&self, name: &str) -> Option<&Host> {
+        let host = self.hosts.get(name);
+
+        if host.is_none() && LOCALHOST.contains(&name) {
+            return Some(&self.localhost);
+        }
+
+        host
     }
 
     pub fn parse_sources(&mut self, sources: Option<&Vec<String>>) -> Result<()> {
@@ -68,10 +82,18 @@ impl InventoryManager {
             warn!("Provided hosts list is empty, only localhost is available. Note that the implicit localhost does not match 'all'");
         }
 
-        let combined_patterns = self.get_combined_patterns(limit, pattern);
+        let split_pattern: Vec<String> = pattern
+            .trim_start_matches('\'')
+            .trim_end_matches('\'')
+            .split(',')
+            .map(|p| p.trim().to_string())
+            .collect();
+
+        // TODO: use combined_patterns to generate hash key for storing results in cache
+        //let combined_patterns = self.get_combined_patterns(limit, pattern);
 
         // Resolve all patterns, expanding from files where necessary
-        let resolved_patterns = PatternResolver::resolve_and_sort_patterns(&combined_patterns);
+        let resolved_patterns = PatternResolver::resolve_and_sort_patterns(&split_pattern);
 
         // Apply resolved patterns to filter hosts
         let mut selected_hosts = self.apply_patterns(resolved_patterns)?;
@@ -86,7 +108,7 @@ impl InventoryManager {
         // Map host names to Host objects, filtering out invalid entries
         Ok(selected_hosts
             .iter()
-            .filter_map(|host| self.hosts.get(host).cloned())
+            .filter_map(|host| self.get_host(host).cloned())
             .collect())
     }
 
@@ -182,6 +204,10 @@ impl InventoryManager {
         {
             let matched_hosts = self.match_list(self.hosts.keys().cloned().collect(), pattern)?;
             hosts.extend(matched_hosts);
+        }
+
+        if hosts.is_empty() && LOCALHOST.contains(&pattern) {
+            hosts.push(pattern.to_string());
         }
 
         Ok(hosts)
