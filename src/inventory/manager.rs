@@ -65,8 +65,13 @@ impl InventoryManager {
     }
 
     fn filter_with_limit(&self, selected_hosts: Vec<String>, limit: &str) -> Result<Vec<String>> {
-        let patterns: Vec<String> = limit.split(',').map(|p| p.trim().to_string()).collect();
-        let resolved_limit_patterns = PatternResolver::resolve_patterns(&patterns);
+        let patterns: Vec<String> = limit
+            .trim_start_matches('\'')
+            .trim_end_matches('\'')
+            .split(',')
+            .map(|p| p.trim().to_string())
+            .collect();
+        let resolved_limit_patterns = PatternResolver::resolve_and_sort_patterns(&patterns);
 
         let limit_hosts = self.apply_patterns(resolved_limit_patterns)?;
         let limit_host_set: HashSet<String> = limit_hosts.into_iter().collect();
@@ -82,7 +87,7 @@ impl InventoryManager {
             warn!("Provided hosts list is empty, only localhost is available. Note that the implicit localhost does not match 'all'");
         }
 
-        let split_pattern: Vec<String> = pattern
+        let mut split_pattern: Vec<String> = pattern
             .trim_start_matches('\'')
             .trim_end_matches('\'')
             .split(',')
@@ -92,11 +97,11 @@ impl InventoryManager {
         // TODO: use combined_patterns to generate hash key for storing results in cache
         //let combined_patterns = self.get_combined_patterns(limit, pattern);
 
-        // Resolve all patterns, expanding from files where necessary
-        let resolved_patterns = PatternResolver::resolve_and_sort_patterns(&split_pattern);
+        split_pattern.sort_by(|a, b| {
+            PatternResolver::get_pattern_priority(a).cmp(&PatternResolver::get_pattern_priority(b))
+        });
 
-        // Apply resolved patterns to filter hosts
-        let mut selected_hosts = self.apply_patterns(resolved_patterns)?;
+        let mut selected_hosts = self.apply_patterns(split_pattern)?;
 
         if let Some(limit) = limit {
             // only keep hosts that match limit specification
@@ -214,6 +219,10 @@ impl InventoryManager {
     }
 
     fn match_list(&self, items: Vec<String>, pattern_str: &str) -> Result<Vec<String>> {
+        if pattern_str == "all" {
+            return Ok(items);
+        }
+
         // Compile patterns
         let pattern = if !pattern_str.starts_with('~') {
             Regex::new(&glob_to_regex(pattern_str)?)?

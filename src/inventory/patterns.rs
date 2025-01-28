@@ -66,9 +66,18 @@ impl PatternResolver {
 
     pub fn resolve_and_sort_patterns(patterns: &[String]) -> Vec<String> {
         let mut resolved_patterns = PatternResolver::resolve_patterns(patterns);
+
+        if resolved_patterns
+            .iter()
+            .all(|p| p.starts_with('!') || p.starts_with('&'))
+        {
+            resolved_patterns.push("all".to_string());
+        }
+
         resolved_patterns.sort_by(|a, b| {
             PatternResolver::get_pattern_priority(a).cmp(&PatternResolver::get_pattern_priority(b))
         });
+
         resolved_patterns
     }
 
