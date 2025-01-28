@@ -26,6 +26,7 @@ fn validate_groups(inventory_manager: &InventoryManager, expected_groups: &[&str
 
 fn validate_hosts(
     inventory_manager: &InventoryManager,
+    inventory: &str,
     pattern: &str,
     limit: Option<&str>,
     expected_hosts: &[&str],
@@ -35,7 +36,8 @@ fn validate_hosts(
 
     if actual_names != expected_hosts {
         panic!(
-            "Host mismatch for pattern '{}', limit: '{}':\n  Expected: {:?}\n  Found:    {:?}",
+            "Host mismatch for inventory: '{}', pattern '{}', limit: '{}':\n  Expected: {:?}\n  Found:    {:?}",
+            inventory,
             pattern,
             limit.unwrap_or("None"),
             expected_hosts,
@@ -46,19 +48,26 @@ fn validate_hosts(
 }
 
 #[rstest]
-#[case("all", None, vec!["mail.example.com", "foo.example.com", "bar.example.com", "one.example.com", "two.example.com", "three.example.com"])]
-#[case("webservers", None, vec!["foo.example.com", "bar.example.com"])]
-#[case("dbservers", None, vec!["one.example.com", "two.example.com", "three.example.com"])]
-#[case("webservers", Some("bar*"), vec!["bar.example.com"])]
-#[case("dbservers", Some("!two.example.com"), vec!["one.example.com", "three.example.com"])]
-fn validate_basic_inventory_hosts(
+#[case("basic.yaml", "all", None, vec!["mail.example.com", "foo.example.com", "bar.example.com", "one.example.com", "two.example.com", "three.example.com"])]
+#[case("basic.yaml", "webservers", None, vec!["foo.example.com", "bar.example.com"])]
+#[case("basic.yaml", "dbservers", None, vec!["one.example.com", "two.example.com", "three.example.com"])]
+#[case("basic.yaml", "webservers", Some("bar*"), vec!["bar.example.com"])]
+#[case("basic.yaml", "dbservers", Some("!two.example.com"), vec!["one.example.com", "three.example.com"])]
+#[case("basic_relationships.yaml", "all", None, vec!["mail.example.com", "foo.example.com", "bar.example.com", "one.example.com", "three.example.com"])]
+#[case("basic_relationships.yaml", "all", Some("foo*, bar*"), vec!["foo.example.com", "bar.example.com"])]
+#[case("basic_relationships.yaml", "prod", None, vec!["foo.example.com", "one.example.com"])]
+#[case("basic_relationships.yaml", "prod", Some("!webservers"), vec!["one.example.com"])]
+#[case("basic_relationships.yaml", "all", Some("webservers[-1], prod[1]"), vec!["bar.example.com", "one.example.com"])]
+fn validate_host_patterns_and_limits(
+    #[case] inventory: &str,
     #[case] pattern: &str,
     #[case] limit: Option<&str>,
     #[case] expected_hosts: Vec<&str>,
 ) -> Result<()> {
-    let inventory_manager = setup_inventory_manager("basic.yaml").unwrap();
+    let inventory_manager = setup_inventory_manager(inventory).unwrap();
     validate_hosts(
         &inventory_manager,
+        inventory,
         pattern,
         limit,
         expected_hosts.as_slice(),
@@ -67,82 +76,16 @@ fn validate_basic_inventory_hosts(
     Ok(())
 }
 
-#[test]
-fn validate_basic_inventory_groups() -> Result<()> {
-    let inventory_manager = setup_inventory_manager("basic.yaml")?;
+#[rstest]
+#[case("basic.yaml", vec!["ungrouped", "webservers", "dbservers"])]
+#[case("basic_relationships.yaml", vec!["ungrouped", "webservers", "dbservers", "east", "west", "prod", "test"])]
+fn validate_inventory_groups(
+    #[case] inventory: &str,
+    #[case] expected_groups: Vec<&str>,
+) -> Result<()> {
+    let inventory_manager = setup_inventory_manager(inventory)?;
 
-    validate_groups(
-        &inventory_manager,
-        &["ungrouped", "webservers", "dbservers"],
-    );
-
-    Ok(())
-}
-
-#[test]
-fn test_basic_relationships_with_limits() -> Result<()> {
-    let inventory_manager = setup_inventory_manager("basic_relationships.yaml")?;
-
-    validate_hosts(
-        &inventory_manager,
-        "all",
-        Some("foo*,bar*"),
-        &["foo.example.com", "bar.example.com"],
-    )?;
-
-    validate_hosts(
-        &inventory_manager,
-        "prod",
-        Some("!webservers"),
-        &["one.example.com"],
-    )?;
-
-    validate_hosts(
-        &inventory_manager,
-        "all",
-        Some("webservers[-1], prod[1]"),
-        &["bar.example.com", "one.example.com"],
-    )?;
-
-    Ok(())
-}
-
-#[test]
-fn test_basic_relationships_no_limits() -> Result<()> {
-    let inventory_manager = setup_inventory_manager("basic_relationships.yaml")?;
-
-    validate_groups(
-        &inventory_manager,
-        &[
-            "ungrouped",
-            "webservers",
-            "dbservers",
-            "east",
-            "west",
-            "prod",
-            "test",
-        ],
-    );
-
-    validate_hosts(
-        &inventory_manager,
-        "all",
-        None,
-        &[
-            "mail.example.com",
-            "foo.example.com",
-            "bar.example.com",
-            "one.example.com",
-            "three.example.com",
-        ],
-    )?;
-
-    validate_hosts(
-        &inventory_manager,
-        "prod",
-        None,
-        &["foo.example.com", "one.example.com"],
-    )?;
+    validate_groups(&inventory_manager, expected_groups.as_slice());
 
     Ok(())
 }
