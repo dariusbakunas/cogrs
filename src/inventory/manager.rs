@@ -45,7 +45,7 @@ impl InventoryManager {
         host
     }
 
-    pub fn parse_sources(&mut self, sources: Option<&Vec<String>>) -> Result<()> {
+    pub fn parse_sources(&mut self, sources: Option<&[String]>) -> Result<()> {
         if let Some(sources) = sources.as_ref() {
             for source in sources.iter() {
                 InventoryParser::parse_source(source, &mut self.groups, &mut self.hosts)?;
@@ -71,7 +71,7 @@ impl InventoryManager {
         combined_patterns
     }
 
-    fn filter_with_limit(&self, selected_hosts: Vec<String>, limit: &str) -> Result<Vec<String>> {
+    fn filter_with_limit(&self, selected_hosts: &[String], limit: &str) -> Result<Vec<String>> {
         let patterns: Vec<String> = limit
             .trim_start_matches('\'')
             .trim_end_matches('\'')
@@ -80,12 +80,13 @@ impl InventoryManager {
             .collect();
         let resolved_limit_patterns = PatternResolver::resolve_and_sort_patterns(&patterns);
 
-        let limit_hosts = self.apply_patterns(resolved_limit_patterns)?;
+        let limit_hosts = self.apply_patterns(&resolved_limit_patterns)?;
         let limit_host_set: HashSet<String> = limit_hosts.into_iter().collect();
 
         Ok(selected_hosts
-            .into_iter()
-            .filter(|host| limit_host_set.contains(host))
+            .iter()
+            .filter(|host| limit_host_set.contains(*host))
+            .cloned()
             .collect())
     }
 
@@ -108,11 +109,11 @@ impl InventoryManager {
             PatternResolver::get_pattern_priority(a).cmp(&PatternResolver::get_pattern_priority(b))
         });
 
-        let mut selected_hosts = self.apply_patterns(split_pattern)?;
+        let mut selected_hosts = self.apply_patterns(&split_pattern)?;
 
         if let Some(limit) = limit {
             // only keep hosts that match limit specification
-            selected_hosts = self.filter_with_limit(selected_hosts, limit)?;
+            selected_hosts = self.filter_with_limit(&selected_hosts, limit)?;
         }
 
         // TODO: handle localhost and all
@@ -124,11 +125,11 @@ impl InventoryManager {
             .collect())
     }
 
-    fn apply_patterns(&self, patterns: Vec<String>) -> Result<Vec<String>> {
+    fn apply_patterns(&self, patterns: &[String]) -> Result<Vec<String>> {
         let mut selected_hosts = Vec::new();
 
         for pattern in patterns {
-            let matched_hosts = self.match_single_pattern(&pattern)?;
+            let matched_hosts = self.match_single_pattern(pattern)?;
 
             if pattern.starts_with('!') {
                 // Exclude hosts matching the pattern
@@ -191,16 +192,17 @@ impl InventoryManager {
     }
 
     fn enumerate_matches(&self, pattern: &str) -> Result<Vec<String>> {
-        let mut hosts = Vec::new();
+        let mut matches = Vec::new();
 
-        let matched_groups = self.match_list(self.groups.keys().cloned().collect(), pattern)?;
+        let groups: Vec<String> = self.groups.keys().cloned().collect();
+        let matched_groups = self.match_list(&groups, pattern)?;
         for group_name in &matched_groups {
             let group = self
                 .groups
                 .get(group_name)
                 .ok_or(anyhow::format_err!("Could not find {group_name} group"))?;
             let group_hosts = group.get_hosts(&self.groups, true)?;
-            hosts.extend(group_hosts);
+            matches.extend(group_hosts);
         }
 
         let special_chars = ['.', '?', '*', '['];
@@ -208,20 +210,21 @@ impl InventoryManager {
             || pattern.starts_with("~")
             || pattern.chars().any(|c| special_chars.contains(&c))
         {
-            let matched_hosts = self.match_list(self.hosts.keys().cloned().collect(), pattern)?;
-            hosts.extend(matched_hosts);
+            let hosts: Vec<String> = self.hosts.keys().cloned().collect();
+            let matched_hosts = self.match_list(&hosts, pattern)?;
+            matches.extend(matched_hosts);
         }
 
-        if hosts.is_empty() && LOCALHOST.contains(&pattern) {
-            hosts.push(pattern.to_string());
+        if matches.is_empty() && LOCALHOST.contains(&pattern) {
+            matches.push(pattern.to_string());
         }
 
-        Ok(hosts)
+        Ok(matches)
     }
 
-    fn match_list(&self, items: Vec<String>, pattern_str: &str) -> Result<Vec<String>> {
+    fn match_list(&self, items: &[String], pattern_str: &str) -> Result<Vec<String>> {
         if pattern_str == "all" {
-            return Ok(items);
+            return Ok(items.to_vec());
         }
 
         // Compile patterns
