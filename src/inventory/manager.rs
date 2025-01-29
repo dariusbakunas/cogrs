@@ -18,6 +18,12 @@ pub struct InventoryManager {
     localhost: Host,
 }
 
+impl Default for InventoryManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InventoryManager {
     pub fn new() -> Self {
         let localhost = Host::new("localhost");
@@ -49,6 +55,7 @@ impl InventoryManager {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn get_combined_patterns(&self, limit: Option<&str>, pattern: &str) -> Vec<String> {
         let stripped_pattern = pattern.trim_start_matches('\'').trim_end_matches('\'');
         let mut combined_patterns: Vec<String> = stripped_pattern
@@ -125,16 +132,10 @@ impl InventoryManager {
 
             if pattern.starts_with('!') {
                 // Exclude hosts matching the pattern
-                selected_hosts = selected_hosts
-                    .into_iter()
-                    .filter(|host| !matched_hosts.contains(host))
-                    .collect();
+                selected_hosts.retain(|host| !matched_hosts.contains(host));
             } else if pattern.starts_with('&') {
                 // Retain only hosts that match the intersection pattern
-                selected_hosts = selected_hosts
-                    .into_iter()
-                    .filter(|host| matched_hosts.contains(host))
-                    .collect();
+                selected_hosts.retain(|host| matched_hosts.contains(host));
             } else {
                 // Add hosts that match the pattern, avoiding duplicates
                 for host in matched_hosts {
@@ -155,16 +156,16 @@ impl InventoryManager {
             pattern
         };
 
-        let (expr, subscript) = split_subscript(stripped_pattern)?;
-        let mut hosts = self.enumerate_matches(&expr)?;
-        if let Some((start, end)) = subscript {
+        let split_pattern = split_subscript(stripped_pattern)?;
+        let mut hosts = self.enumerate_matches(&split_pattern.pattern)?;
+        if let Some((start, end)) = split_pattern.subscript {
             hosts = self.apply_subscript(&hosts, start, end);
         }
 
         Ok(hosts)
     }
 
-    fn apply_subscript(&self, hosts: &Vec<String>, start: i32, end: Option<i32>) -> Vec<String> {
+    fn apply_subscript(&self, hosts: &[String], start: i32, end: Option<i32>) -> Vec<String> {
         if hosts.is_empty() {
             return vec![];
         }

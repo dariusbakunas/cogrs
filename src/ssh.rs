@@ -1,5 +1,6 @@
 use anyhow::Result;
 
+#[allow(dead_code)]
 pub async fn execute_on_host(host: &str, args: &str) -> Result<()> {
     use log::info;
     use openssh::{KnownHosts, Session};

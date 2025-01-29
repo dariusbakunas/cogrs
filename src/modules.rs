@@ -2,6 +2,7 @@ use crate::ssh::execute_on_host;
 use cogrs::cli::Cli;
 use log::{error, warn};
 
+#[allow(dead_code)]
 pub async fn handle_module_execution(module: &str, cli: &Cli, hosts: Option<Vec<String>>) {
     if module == "shell" {
         let args = cli.args.clone().unwrap();

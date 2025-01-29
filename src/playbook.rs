@@ -14,8 +14,9 @@ pub struct Task {
     pub shell: Option<String>,
 }
 
-pub fn load_playbook(path: &PathBuf) -> Vec<Play> {
-    let f = std::fs::File::open(path).expect("Could not open playbook file.");
+#[allow(dead_code)]
+pub fn load_playbook(playbook_path: &PathBuf) -> Vec<Play> {
+    let f = std::fs::File::open(playbook_path).expect("Could not open playbook file.");
     let playbook: Vec<Play> = serde_yaml::from_reader(f).expect("Could not parse playbook file.");
     playbook
 }

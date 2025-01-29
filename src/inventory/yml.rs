@@ -114,14 +114,14 @@ fn parse_group_vars(group: &mut Group, val: &Value) -> Result<()> {
             } else {
                 bail!(
                     "YAML group has invalid structure, vars keys should be strings, got: {}",
-                    get_value_type(&key)
+                    get_value_type(key)
                 )
             }
         }
     } else {
         bail!(
             "YAML group has invalid structure, vars should be a dictionary, got: {}",
-            get_value_type(&val)
+            get_value_type(val)
         )
     }
 
@@ -150,7 +150,7 @@ fn parse_group_hosts(
     } else {
         error!(
             "YAML group has invalid structure, hosts should be a dictionary, got: {}",
-            get_value_type(&val)
+            get_value_type(val)
         );
     }
     Ok(())
@@ -174,7 +174,7 @@ fn parse_group_children(
                     _ => {
                         error!(
                             "YAML group 'children' field has invalid structure, expected dictionary or null, got: {}",
-                            get_value_type(&child_val)
+                            get_value_type(child_val)
                         );
                         continue;
                     }

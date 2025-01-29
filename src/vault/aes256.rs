@@ -3,6 +3,7 @@ use openssl::hash::MessageDigest;
 use openssl::pkcs5::pbkdf2_hmac;
 use openssl::symm::{Cipher, Crypter, Mode};
 use sha2::Sha256;
+use std::fmt::Write;
 use thiserror::Error;
 use zeroize::Zeroize;
 
@@ -16,7 +17,11 @@ pub struct HexUtils;
 
 impl HexUtils {
     pub fn encode(data: &[u8]) -> String {
-        data.iter().map(|b| format!("{:02x}", b)).collect()
+        // using write! instead of format! to avoid extra allocations
+        data.iter().fold(String::new(), |mut acc, b| {
+            let _ = write!(acc, "{:02x}", b);
+            acc
+        })
     }
 
     pub fn decode(hex: &str) -> Result<Vec<u8>, AES256Error> {
@@ -38,8 +43,14 @@ impl HexUtils {
 
 pub struct KeyDeriver;
 
+pub struct DerivedKeys {
+    pub key1: Vec<u8>,
+    pub key2: Vec<u8>,
+    pub iv: Vec<u8>,
+}
+
 impl KeyDeriver {
-    pub fn derive(secret: &[u8], salt: &[u8]) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), AES256Error> {
+    pub fn derive(secret: &[u8], salt: &[u8]) -> Result<DerivedKeys, AES256Error> {
         let mut key_material = [0u8; KEY_LEN * 2 + IV_LEN];
         pbkdf2_hmac(
             secret,
@@ -53,8 +64,13 @@ impl KeyDeriver {
         let (key1, rest) = key_material.split_at(KEY_LEN);
         let (key2, iv) = rest.split_at(KEY_LEN);
 
-        let result = (key1.to_vec(), key2.to_vec(), iv.to_vec());
-        let _ = key_material.zeroize();
+        let result = DerivedKeys {
+            key1: key1.to_vec(),
+            key2: key2.to_vec(),
+            iv: iv.to_vec(),
+        };
+
+        key_material.zeroize();
         Ok(result)
     }
 }
@@ -91,10 +107,16 @@ impl From<std::str::Utf8Error> for AES256Error {
     }
 }
 
+pub struct ParsedEncryptedData {
+    pub salt: Vec<u8>,
+    pub hmac_tag: Vec<u8>,
+    pub ciphertext: Vec<u8>,
+}
+
 pub struct AES256;
 
 impl AES256 {
-    fn parse_encrypted_data(data: &str) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), AES256Error> {
+    fn parse_encrypted_data(data: &str) -> Result<ParsedEncryptedData, AES256Error> {
         let encrypted_bytes = HexUtils::decode(data)?;
         if encrypted_bytes.len() < SALT_LEN + HMAC_LEN + 1 {
             Err(AES256Error::InvalidFormat(
@@ -113,22 +135,32 @@ impl AES256 {
         let hmac_tag = HexUtils::decode(std::str::from_utf8(parts[1])?)?;
         let ciphertext = HexUtils::decode(std::str::from_utf8(parts[2])?)?;
 
-        Ok((salt, hmac_tag, ciphertext))
+        Ok(ParsedEncryptedData {
+            salt,
+            hmac_tag,
+            ciphertext,
+        })
     }
 
     pub fn decrypt_aes256(data: &str, secret: &str) -> Result<String, AES256Error> {
         // Decode hex-encoded data
-        let (salt, crypted_hmac, ciphertext) = AES256::parse_encrypted_data(data)?;
-        let (key1, key2, iv) = KeyDeriver::derive(secret.as_bytes(), salt.as_slice())?;
+        let parsed_encrypted_data = AES256::parse_encrypted_data(data)?;
+        let derived_keys =
+            KeyDeriver::derive(secret.as_bytes(), parsed_encrypted_data.salt.as_slice())?;
 
         // Verify HMAC-SHA256 tag
-        let mut hmac = Hmac::<Sha256>::new_from_slice(key2.as_slice())
+        let mut hmac = Hmac::<Sha256>::new_from_slice(derived_keys.key2.as_slice())
             .map_err(|_| AES256Error::HmacFailure)?;
-        hmac.update(ciphertext.as_slice()); // Include ciphertext in HMAC
-        hmac.verify_slice(crypted_hmac.as_slice())
+        hmac.update(parsed_encrypted_data.ciphertext.as_slice()); // Include ciphertext in HMAC
+        hmac.verify_slice(parsed_encrypted_data.hmac_tag.as_slice())
             .map_err(|_| AES256Error::IntegrityError("Failed to verify HMAC tag".to_string()))?;
 
-        let plaintext = AES256::crypt_aes256_ctr(Mode::Decrypt, &key1, &iv, &ciphertext)?;
+        let plaintext = AES256::crypt_aes256_ctr(
+            Mode::Decrypt,
+            &derived_keys.key1,
+            &derived_keys.iv,
+            &parsed_encrypted_data.ciphertext,
+        )?;
 
         // Convert to string
         let plaintext_str =
@@ -161,11 +193,16 @@ impl AES256 {
         let mut salt = [0u8; SALT_LEN];
         rand_bytes(&mut salt).map_err(|_| AES256Error::RngError)?;
 
-        let (key1, key2, iv) = KeyDeriver::derive(secret.as_bytes(), salt.as_slice())?;
-        let ciphertext = AES256::crypt_aes256_ctr(Mode::Encrypt, &key1, &iv, data.as_bytes())?;
+        let derived_keys = KeyDeriver::derive(secret.as_bytes(), salt.as_slice())?;
+        let ciphertext = AES256::crypt_aes256_ctr(
+            Mode::Encrypt,
+            &derived_keys.key1,
+            &derived_keys.iv,
+            data.as_bytes(),
+        )?;
 
         // Compute HMAC-SHA256 for the ciphertext
-        let mut hmac = Hmac::<Sha256>::new_from_slice(key2.as_slice())
+        let mut hmac = Hmac::<Sha256>::new_from_slice(derived_keys.key2.as_slice())
             .map_err(|_| AES256Error::HmacFailure)?;
         hmac.update(&ciphertext);
         let hmac_tag = hmac.finalize().into_bytes();
@@ -237,11 +274,11 @@ mod tests {
         let mut salt = [0u8; 32];
         rand_bytes(&mut salt).expect("Failed to generate random salt");
 
-        let result = KeyDeriver::derive(secret, &salt).expect("Key derivation failed");
+        let derived_keys = KeyDeriver::derive(secret, &salt).expect("Key derivation failed");
 
-        assert_eq!(result.0.len(), 32, "Key1 should be 32 bytes");
-        assert_eq!(result.1.len(), 32, "Key2 should be 32 bytes");
-        assert_eq!(result.2.len(), 16, "IV should be 16 bytes");
+        assert_eq!(derived_keys.key1.len(), 32, "Key1 should be 32 bytes");
+        assert_eq!(derived_keys.key2.len(), 32, "Key2 should be 32 bytes");
+        assert_eq!(derived_keys.iv.len(), 16, "IV should be 16 bytes");
     }
 
     #[test]
@@ -272,17 +309,17 @@ mod tests {
 
         // Tamper with the HMAC section specifically
         let mut tampered_encrypted = encrypted.clone();
-        let (salt, hmac, ciphertext) = AES256::parse_encrypted_data(&tampered_encrypted).unwrap();
+        let parsed_encrypted_data = AES256::parse_encrypted_data(&tampered_encrypted).unwrap();
 
-        let mut tampered_hmac = hmac.clone(); // Get the HMAC part
+        let mut tampered_hmac = parsed_encrypted_data.hmac_tag.clone(); // Get the HMAC part
         if let Some(pos) = tampered_hmac.len().checked_sub(2) {
             tampered_hmac.insert(pos, 255); // Tamper with valid hex in the HMAC part
         }
         tampered_encrypted = format!(
             "{}\n{}\n{}",
-            HexUtils::encode(&salt),
+            HexUtils::encode(&parsed_encrypted_data.salt),
             HexUtils::encode(&tampered_hmac),
-            HexUtils::encode(&ciphertext)
+            HexUtils::encode(&parsed_encrypted_data.ciphertext)
         ); // Reconstruct tampered data
         tampered_encrypted = HexUtils::encode(tampered_encrypted.as_bytes());
 

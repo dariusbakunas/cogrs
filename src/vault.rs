@@ -4,6 +4,7 @@ use crate::constants::VAULT_HEADER;
 use crate::vault::aes256::AES256;
 use anyhow::{bail, Result};
 
+#[derive(Default, Debug)]
 pub struct Vault {}
 
 impl Vault {

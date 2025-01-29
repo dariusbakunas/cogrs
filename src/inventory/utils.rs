@@ -1,18 +1,26 @@
 use anyhow::bail;
 use regex::Regex;
 
-pub fn difference_update_vec<T: PartialEq>(vec: &mut Vec<T>, other: &Vec<T>) {
+pub fn difference_update_vec<T: PartialEq>(vec: &mut Vec<T>, other: &[T]) {
     // Iterate over elements of `other` - remove them from `vec`
     vec.retain(|item| !other.contains(item));
+}
+
+pub struct SplitPattern {
+    pub pattern: String,
+    pub subscript: Option<(i32, Option<i32>)>,
 }
 
 /// Takes a pattern, checks if it has a subscript, and returns the pattern
 /// without the subscript and a (start,end) tuple representing the given
 /// subscript (or None if there is no subscript).
-pub fn split_subscript(pattern: &str) -> anyhow::Result<(String, Option<(i32, Option<i32>)>)> {
+pub fn split_subscript(pattern: &str) -> anyhow::Result<SplitPattern> {
     // Do not parse regexes for enumeration info
     if pattern.starts_with('~') {
-        return Ok((pattern.to_string(), None));
+        return Ok(SplitPattern {
+            pattern: pattern.to_string(),
+            subscript: None,
+        });
     }
 
     // Compiling the regex for pattern with subscript
@@ -35,7 +43,10 @@ pub fn split_subscript(pattern: &str) -> anyhow::Result<(String, Option<(i32, Op
 
         if let Some(idx_match) = captures.get(2) {
             let idx = idx_match.as_str().parse::<i32>()?;
-            return Ok((trimmed_pattern, Some((idx, None))));
+            return Ok(SplitPattern {
+                pattern: trimmed_pattern,
+                subscript: Some((idx, None)),
+            });
         } else {
             let start = captures.get(3).map_or(0, |start_str| {
                 let s = start_str.as_str();
@@ -61,11 +72,17 @@ pub fn split_subscript(pattern: &str) -> anyhow::Result<(String, Option<(i32, Op
                 println!("Warning: Use [x:y] inclusive subscripts instead of [x-y], which has been removed.");
             }
 
-            return Ok((trimmed_pattern, Some((start, Some(end)))));
+            return Ok(SplitPattern {
+                pattern: trimmed_pattern,
+                subscript: Some((start, Some(end))),
+            });
         }
     }
 
-    Ok((pattern.to_string(), None))
+    Ok(SplitPattern {
+        pattern: pattern.to_string(),
+        subscript: None,
+    })
 }
 
 pub fn glob_to_regex(glob: &str) -> anyhow::Result<String> {
@@ -95,7 +112,7 @@ pub fn parse_host_pattern(pattern: &str) -> anyhow::Result<Vec<String>> {
     if matches.len() > 1 {
         // Return an error if multiple patterns are detected
         bail!("Multiple patterns not supported: {}", pattern);
-    } else if let Some(captures) = matches.get(0) {
+    } else if let Some(captures) = matches.first() {
         // Extract the prefix, suffix, and range part from the input
         let full_match = &captures[0];
         let start = &captures[1];
@@ -145,96 +162,95 @@ pub fn parse_host_pattern(pattern: &str) -> anyhow::Result<Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::inventory::manager::InventoryManager;
 
     #[test]
     fn test_split_subscript_no_subscript() {
         let input_pattern = "pattern_without_subscript";
-        let (parsed_pattern, subscript) = split_subscript(input_pattern).unwrap();
+        let split_pattern = split_subscript(input_pattern).unwrap();
 
-        assert_eq!(parsed_pattern, input_pattern.to_string());
-        assert!(subscript.is_none());
+        assert_eq!(split_pattern.pattern, input_pattern.to_string());
+        assert!(split_pattern.subscript.is_none());
     }
 
     #[test]
     fn test_split_subscript_with_single_index_subscript() {
         let input_pattern = "host[3]";
-        let (parsed_pattern, subscript) = split_subscript(input_pattern).unwrap();
+        let split_pattern = split_subscript(input_pattern).unwrap();
 
-        assert_eq!(parsed_pattern, "host".to_string());
-        assert_eq!(subscript, Some((3, None)));
+        assert_eq!(split_pattern.pattern, "host".to_string());
+        assert_eq!(split_pattern.subscript, Some((3, None)));
     }
 
     #[test]
     fn test_split_subscript_with_positive_range_subscript() {
         let input_pattern = "host[1:4]";
-        let (parsed_pattern, subscript) = split_subscript(input_pattern).unwrap();
+        let split_pattern = split_subscript(input_pattern).unwrap();
 
-        assert_eq!(parsed_pattern, "host".to_string());
-        assert_eq!(subscript, Some((1, Some(4))));
+        assert_eq!(split_pattern.pattern, "host".to_string());
+        assert_eq!(split_pattern.subscript, Some((1, Some(4))));
     }
 
     #[test]
     fn test_split_subscript_with_negative_index() {
         let input_pattern = "host[-2]";
-        let (parsed_pattern, subscript) = split_subscript(input_pattern).unwrap();
+        let split_pattern = split_subscript(input_pattern).unwrap();
 
-        assert_eq!(parsed_pattern, "host".to_string());
-        assert_eq!(subscript, Some((-2, None)));
+        assert_eq!(split_pattern.pattern, "host".to_string());
+        assert_eq!(split_pattern.subscript, Some((-2, None)));
     }
 
     #[test]
     fn test_split_subscript_with_positive_to_infinite_range() {
         let input_pattern = "host[5:]";
-        let (parsed_pattern, subscript) = split_subscript(input_pattern).unwrap();
+        let split_pattern = split_subscript(input_pattern).unwrap();
 
-        assert_eq!(parsed_pattern, "host".to_string());
-        assert_eq!(subscript, Some((5, Some(-1))));
+        assert_eq!(split_pattern.pattern, "host".to_string());
+        assert_eq!(split_pattern.subscript, Some((5, Some(-1))));
     }
 
     #[test]
     fn test_split_subscript_with_infinite_to_negative_end_range() {
         let input_pattern = "host[:-3]";
-        let (parsed_pattern, subscript) = split_subscript(input_pattern).unwrap();
+        let split_pattern = split_subscript(input_pattern).unwrap();
 
-        assert_eq!(parsed_pattern, "host[:-3]".to_string());
-        assert_eq!(subscript, None);
+        assert_eq!(split_pattern.pattern, "host[:-3]".to_string());
+        assert_eq!(split_pattern.subscript, None);
     }
 
     #[test]
     fn test_split_subscript_with_invalid_pattern() {
         let input_pattern = "host[invalid]";
-        let (parsed_pattern, subscript) = split_subscript(input_pattern).unwrap();
+        let split_pattern = split_subscript(input_pattern).unwrap();
 
         // In case of an invalid pattern, the function should return the full pattern unchanged,
         // and subscript should be None.
-        assert_eq!(parsed_pattern, input_pattern.to_string());
-        assert!(subscript.is_none());
+        assert_eq!(split_pattern.pattern, input_pattern.to_string());
+        assert!(split_pattern.subscript.is_none());
     }
 
     #[test]
     fn test_split_subscript_with_regex_flag() {
         let input_pattern = "~host_regex[3]";
-        let (parsed_pattern, subscript) = split_subscript(input_pattern).unwrap();
+        let split_pattern = split_subscript(input_pattern).unwrap();
 
         // Regex patterns are not subjected to parsing for subscripts and remain intact.
-        assert_eq!(parsed_pattern, input_pattern.to_string());
-        assert!(subscript.is_none());
+        assert_eq!(split_pattern.pattern, input_pattern.to_string());
+        assert!(split_pattern.subscript.is_none());
     }
 
     #[test]
     fn test_split_subscript_edge_cases() {
         // Empty input
         let input_pattern_empty = "";
-        let (parsed_empty, subscript_empty) = split_subscript(input_pattern_empty).unwrap();
-        assert_eq!(parsed_empty, "".to_string());
-        assert!(subscript_empty.is_none());
+        let split_pattern = split_subscript(input_pattern_empty).unwrap();
+        assert_eq!(split_pattern.pattern, "".to_string());
+        assert!(split_pattern.subscript.is_none());
 
         // Special characters in pattern
         let input_pattern_special = "host[*][1]";
-        let (parsed_special, subscript_special) = split_subscript(input_pattern_special).unwrap();
-        assert_eq!(parsed_special, "host[*]".to_string());
-        assert_eq!(subscript_special, Some((1, None)));
+        let split_pattern = split_subscript(input_pattern_special).unwrap();
+        assert_eq!(split_pattern.pattern, "host[*]".to_string());
+        assert_eq!(split_pattern.subscript, Some((1, None)));
     }
 
     #[test]

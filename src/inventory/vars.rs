@@ -52,8 +52,7 @@ impl TryFrom<&serde_yaml::Value> for Variable {
             }
             Value::String(s) => Ok(Variable::String(s.to_string())),
             Value::Sequence(s) => {
-                let sequence: Result<Sequence, _> =
-                    s.into_iter().map(|v| Variable::try_from(v)).collect();
+                let sequence: Result<Sequence, _> = s.iter().map(Variable::try_from).collect();
                 sequence.map(Variable::Sequence)
             }
             Value::Mapping(m) => {

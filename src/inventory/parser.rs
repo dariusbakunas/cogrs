@@ -45,21 +45,19 @@ impl InventoryParser {
 
         let exclude_pattern = Regex::new(r"^(?:\.|host_vars|group_vars|vars_plugins)(/|$)")?;
 
-        for path in paths {
-            if let Ok(entry) = path {
-                let entry_path = entry.path();
-                let entry_str = entry_path.to_str().unwrap_or("");
+        for entry in paths.flatten() {
+            let entry_path = entry.path();
+            let entry_str = entry_path.to_str().unwrap_or("");
 
-                if let Some(file_name) = entry_path.file_name() {
-                    let filename = file_name.to_str().unwrap_or("");
+            if let Some(file_name) = entry_path.file_name() {
+                let filename = file_name.to_str().unwrap_or("");
 
-                    if exclude_pattern.is_match(filename) {
-                        debug!("Skipping excluded file or directory: {}", entry_str);
-                        continue;
-                    }
-
-                    InventoryParser::parse_source(entry_str, groups, hosts)?;
+                if exclude_pattern.is_match(filename) {
+                    debug!("Skipping excluded file or directory: {}", entry_str);
+                    continue;
                 }
+
+                InventoryParser::parse_source(entry_str, groups, hosts)?;
             }
         }
 
