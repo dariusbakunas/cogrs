@@ -56,7 +56,7 @@ More documentation and detailed usage examples will be added as the project evol
 ## Roadmap
 
 Features planned for future releases include:
-- Full compatibility with Ansible inventories and playbooks.
+- Expanded compatibility with Ansible inventories and playbooks (partial, no plugin/module support).
 - Support for custom task execution (similar to Ansible modules).
 - Enhanced logging and debugging options.
 - Expanding supported connection types (SSH, etc.).
@@ -65,7 +65,7 @@ Features planned for future releases include:
 
 ## Contributing
 
-Contributions are welcome! This is currently a learning project, so feel free to submit issues, feature requests, or pull requests to help improve CogRS.
+This is currently a learning project, so feel free to submit issues, feature requests to help improve CogRS.
 
 For ideas or discussions, start a thread in the [GitHub Issues](https://github.com/dariusbakunas/cogrs/issues) section.
 
