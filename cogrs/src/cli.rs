@@ -2,7 +2,7 @@ use clap::Parser;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
+#[command(version = env!("APP_VERSION"), about, long_about = None)]
 pub struct Cli {
     #[arg(short, long, value_name = "FILE")]
     config: Option<PathBuf>,
