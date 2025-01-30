@@ -1,0 +1,25 @@
+[package]
+name = "cogrs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.26", features = ["derive"] }
+serde_yaml = "0.9.34"
+serde = { version = "1.0.217", features = ["derive"] }
+openssh = { version = "0.11.5", features = ["native-mux"] }
+log = "0.4.25"
+env_logger = "0.11.6"
+tokio = { version = "1.43.0", features = ["full"] }
+anyhow = "1.0.95"
+regex = "1.11.1"
+sha2 = "0.11.0-pre.4"
+hmac = "0.13.0-pre.4"
+openssl = "0.10.69"
+thiserror = "2.0.11"
+zeroize = "1.8.1"
+indexmap = "2.7.1"
+
+[dev-dependencies]
+rstest = "0.24.0"
+tempfile = "3.15.0"
