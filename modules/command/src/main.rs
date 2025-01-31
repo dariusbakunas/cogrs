@@ -25,7 +25,10 @@ impl Module for CommandModule {
         SCHEMA
     }
 
-    fn run(_inputs: serde_json::value::Value) -> Result<()> {
+    fn run(inputs: serde_json::value::Value) -> Result<()> {
+        let cmd = inputs["cmd"].as_str().unwrap();
+        println!("Running command: {}", cmd);
+
         Ok(())
     }
 }
