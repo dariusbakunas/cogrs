@@ -39,14 +39,29 @@ builds:
 
 archives:
   - format: tar.gz
-    # this name template makes the OS and Arch compatible with the results of `uname`.
+    id: cogrs
     name_template: >-
-      {{ .ProjectName }}_
+      {{ .ProjectName }}_cli_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
-    # use zip for windows archives
+    builds:
+      - cogrs  # Associate this archive with the cogrs build
+    format_overrides:
+      - goos: windows
+        format: zip
+
+  - format: tar.gz
+    id: command
+    name_template: >-
+      {{ .ProjectName }}_command_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+    builds:
+      - command  # Associate this archive with the command build
     format_overrides:
       - goos: windows
         format: zip
