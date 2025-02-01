@@ -136,4 +136,5 @@ target/
 # used for local integration testing for now
 testing/
 dist/
+.intentionally-empty-file.o
 # End of https://www.toptal.com/developers/gitignore/api/intellij+all,osx,rust
