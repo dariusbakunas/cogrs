@@ -1,16 +1,20 @@
+use aes::Aes256;
+use cipher::{KeyIvInit, StreamCipher};
+use ctr::Ctr128BE;
 use hmac::{Hmac, KeyInit, Mac};
-use openssl::hash::MessageDigest;
-use openssl::pkcs5::pbkdf2_hmac;
-use openssl::symm::{Cipher, Crypter, Mode};
+use rand::rngs::OsRng;
+use rand::TryRngCore;
+use ring::pbkdf2;
 use sha2::Sha256;
 use std::fmt::Write;
+use std::num::NonZeroU32;
 use thiserror::Error;
 use zeroize::Zeroize;
 
 const SALT_LEN: usize = 32;
 const KEY_LEN: usize = 32; // AES-256 and HMAC-SHA256 require 32-byte keys
 const IV_LEN: usize = 16; // AES-CTR uses a 16-byte initialization vector
-const PBKDF2_ITERATIONS: usize = 10_000;
+const PBKDF2_ITERATIONS: u32 = 10_000;
 const HMAC_LEN: usize = 32; // For SHA-256, the output size is always 32 bytes
 
 pub struct HexUtils;
@@ -44,30 +48,31 @@ impl HexUtils {
 pub struct KeyDeriver;
 
 pub struct DerivedKeys {
-    pub key1: Vec<u8>,
-    pub key2: Vec<u8>,
-    pub iv: Vec<u8>,
+    pub key1: [u8; KEY_LEN],
+    pub key2: [u8; KEY_LEN],
+    pub iv: [u8; IV_LEN],
 }
 
 impl KeyDeriver {
     pub fn derive(secret: &[u8], salt: &[u8]) -> Result<DerivedKeys, AES256Error> {
         let mut key_material = [0u8; KEY_LEN * 2 + IV_LEN];
-        pbkdf2_hmac(
-            secret,
+
+        // Derive key material using PBKDF2
+        pbkdf2::derive(
+            pbkdf2::PBKDF2_HMAC_SHA256,
+            NonZeroU32::new(PBKDF2_ITERATIONS).unwrap(),
             salt,
-            PBKDF2_ITERATIONS,
-            MessageDigest::sha256(),
+            secret,
             &mut key_material,
-        )
-        .map_err(|e| AES256Error::KeyDerivationFailed(e.to_string()))?;
+        );
 
         let (key1, rest) = key_material.split_at(KEY_LEN);
         let (key2, iv) = rest.split_at(KEY_LEN);
 
         let result = DerivedKeys {
-            key1: key1.to_vec(),
-            key2: key2.to_vec(),
-            iv: iv.to_vec(),
+            key1: <[u8; KEY_LEN]>::try_from(key1).unwrap(),
+            key2: <[u8; KEY_LEN]>::try_from(key2).unwrap(),
+            iv: <[u8; IV_LEN]>::try_from(iv).unwrap(),
         };
 
         key_material.zeroize();
@@ -95,12 +100,6 @@ pub enum AES256Error {
     RngError,
 }
 
-impl From<openssl::error::ErrorStack> for AES256Error {
-    fn from(err: openssl::error::ErrorStack) -> Self {
-        AES256Error::OpenSslError(err.to_string())
-    }
-}
-
 impl From<std::str::Utf8Error> for AES256Error {
     fn from(_: std::str::Utf8Error) -> Self {
         AES256Error::InvalidUtf8Data
@@ -114,6 +113,7 @@ pub struct ParsedEncryptedData {
 }
 
 pub struct AES256;
+pub type Aes256Ctr = Ctr128BE<Aes256>;
 
 impl AES256 {
     fn parse_encrypted_data(data: &str) -> Result<ParsedEncryptedData, AES256Error> {
@@ -155,51 +155,27 @@ impl AES256 {
         hmac.verify_slice(parsed_encrypted_data.hmac_tag.as_slice())
             .map_err(|_| AES256Error::IntegrityError("Failed to verify HMAC tag".to_string()))?;
 
-        let plaintext = AES256::crypt_aes256_ctr(
-            Mode::Decrypt,
-            &derived_keys.key1,
-            &derived_keys.iv,
-            &parsed_encrypted_data.ciphertext,
-        )?;
+        let mut cipher = Aes256Ctr::new(derived_keys.key1.as_ref(), derived_keys.iv.as_ref());
+
+        let mut plaintext = parsed_encrypted_data.ciphertext.to_vec();
+        cipher.apply_keystream(&mut plaintext);
 
         // Convert to string
-        let plaintext_str =
-            String::from_utf8(plaintext).map_err(|_| AES256Error::InvalidUtf8Data)?;
-
-        Ok(plaintext_str)
-    }
-
-    fn crypt_aes256_ctr(
-        mode: Mode,
-        key: &[u8],
-        iv: &[u8],
-        input: &[u8],
-    ) -> anyhow::Result<Vec<u8>, AES256Error> {
-        let cipher = Cipher::aes_256_ctr();
-        let mut crypter = Crypter::new(cipher, mode, key, Some(iv))?;
-        crypter.pad(false);
-
-        let mut output = vec![0; input.len() + cipher.block_size()];
-        let mut count = crypter.update(input, &mut output)?;
-        count += crypter.finalize(&mut output[count..])?;
-        output.truncate(count);
-        Ok(output)
+        String::from_utf8(plaintext).map_err(|_| AES256Error::InvalidUtf8Data)
     }
 
     pub fn encrypt_aes256(data: &str, secret: &str) -> Result<String, AES256Error> {
-        use openssl::rand::rand_bytes;
-
-        // Generate a random salt and initialization vector (IV)
         let mut salt = [0u8; SALT_LEN];
-        rand_bytes(&mut salt).map_err(|_| AES256Error::RngError)?;
+        OsRng
+            .try_fill_bytes(&mut salt)
+            .or(Err(AES256Error::RngError))?;
 
         let derived_keys = KeyDeriver::derive(secret.as_bytes(), salt.as_slice())?;
-        let ciphertext = AES256::crypt_aes256_ctr(
-            Mode::Encrypt,
-            &derived_keys.key1,
-            &derived_keys.iv,
-            data.as_bytes(),
-        )?;
+
+        let mut cipher = Aes256Ctr::new((&derived_keys.key1).into(), (&derived_keys.iv).into());
+
+        let mut ciphertext = data.as_bytes().to_vec();
+        cipher.apply_keystream(&mut ciphertext);
 
         // Compute HMAC-SHA256 for the ciphertext
         let mut hmac = Hmac::<Sha256>::new_from_slice(derived_keys.key2.as_slice())
@@ -222,7 +198,8 @@ impl AES256 {
 #[cfg(test)]
 mod tests {
     use super::{AES256Error, HexUtils, KeyDeriver, AES256};
-    use openssl::rand::rand_bytes;
+    use rand::rngs::OsRng;
+    use rand::TryRngCore;
 
     const TEST_SECRET: &str = "my_secure_password";
     const TEST_DATA: &str = "This is a test message!";
@@ -272,7 +249,10 @@ mod tests {
     fn test_key_derivation_works() {
         let secret = TEST_SECRET.as_bytes();
         let mut salt = [0u8; 32];
-        rand_bytes(&mut salt).expect("Failed to generate random salt");
+        OsRng
+            .try_fill_bytes(&mut salt)
+            .or(Err(AES256Error::RngError))
+            .unwrap();
 
         let derived_keys = KeyDeriver::derive(secret, &salt).expect("Key derivation failed");
 

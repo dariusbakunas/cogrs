@@ -2,7 +2,6 @@ use anyhow::Result;
 use clap::Parser;
 use cogrs::cli::Cli;
 use cogrs::inventory::manager;
-use cogrs::modules::{ModuleType, Modules};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -31,10 +30,8 @@ fn run() -> Result<()> {
         for host in hosts {
             println!("{host}");
         }
-    } else if let Some(module_name) = cli.module_name {
-        let modules = Modules::new();
-        let module_type: ModuleType = module_name.parse()?;
-        modules.run(module_type, cli.args.as_deref());
+    } else if let Some(_module_name) = cli.module_name {
+        let _args = cli.args.unwrap_or(String::from("{}"));
     } else {
         todo!()
     }

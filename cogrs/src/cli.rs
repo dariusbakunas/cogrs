@@ -11,7 +11,8 @@ pub struct Cli {
     #[arg(long, action)]
     pub list_hosts: bool,
 
-    /// the action's options in space separated k=v format: -a 'opt1=val1 opt2=val2' or a json string: -a '{"opt1": "val1", "opt2": "val2"}'
+    /// the action's options as json string: -a '{"opt1": "val1", "opt2": "val2"}'
+    /// should match module schema, to get schema run: `module_name --schema`
     #[arg(short, long)]
     pub args: Option<String>,
 
