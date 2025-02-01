@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use cogrs::cli::Cli;
-use cogrs::inventory::manager;
+use cogrs_core::inventory::manager;
 
 #[tokio::main]
 async fn main() -> Result<()> {

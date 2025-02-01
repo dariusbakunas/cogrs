@@ -1,5 +1,5 @@
 use anyhow::Result;
-use cogrs::inventory::manager::InventoryManager;
+use cogrs_core::inventory::manager::InventoryManager;
 use rstest::rstest;
 use std::path::PathBuf;
 

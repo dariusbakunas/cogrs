@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
-use common::framework::Module;
-use common::{define_module, define_schema};
+use cogrs_modules::framework::Module;
+use cogrs_modules::{define_module, define_schema};
 
 define_schema! {
     r#"

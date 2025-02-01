@@ -5,6 +5,6 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.26", features = ["derive"] }
-common = { path = "../../common" }
+cogrs-modules = { path = "../../cogrs-modules" }
 serde_json = "1.0.138"
 anyhow = "1.0.95"

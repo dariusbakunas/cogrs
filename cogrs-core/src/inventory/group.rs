@@ -200,8 +200,8 @@ impl Group {
     ///
     /// # Example
     /// ```rust
-    /// use cogrs::inventory::group::Group;
-    /// use cogrs::inventory::vars::Variable;
+    /// use cogrs_core::inventory::group::Group;
+    /// use cogrs_core::inventory::vars::Variable;
     /// let mut group = Group::new("example_group");
     /// let variable = Variable::String(String::from("example"));  // Replace with actual `Variable` type instance
     /// group.set_variable("key_name", variable);
