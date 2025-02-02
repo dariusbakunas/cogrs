@@ -297,6 +297,7 @@ dependencies = [
  "clap",
  "cogrs-core",
  "env_logger",
+ "log",
  "rstest",
  "tempfile",
  "tokio",

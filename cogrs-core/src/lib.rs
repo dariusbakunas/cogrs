@@ -1,4 +1,10 @@
+pub mod adhoc;
+pub mod block;
 pub mod constants;
 pub mod inventory;
+pub mod play;
 pub mod playbook;
+pub mod task;
+pub mod task_queue_manager;
+pub mod vars;
 pub mod vault;

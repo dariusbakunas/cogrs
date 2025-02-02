@@ -16,6 +16,9 @@ pub struct Cli {
     #[arg(short, long)]
     pub args: Option<String>,
 
+    #[arg(short, long, default_value = "5")]
+    pub forks: u32,
+
     /// name of the action to execute
     #[arg(short, long, group = "action")]
     pub module_name: Option<String>,
@@ -23,6 +26,23 @@ pub struct Cli {
     /// further limit selected hosts to an additional pattern
     #[arg(short, long, value_name = "SUBSET")]
     pub limit: Option<String>,
+
+    #[arg(long, value_name = "SECONDS")]
+    pub task_timeout: Option<u64>,
+
+    #[arg(short = 'B', long, value_name = "SECONDS")]
+    pub async_val: Option<u64>,
+
+    #[arg(
+        short = 'P',
+        long = "poll",
+        value_name = "SECONDS",
+        default_value = "15"
+    )]
+    pub poll_interval: u64,
+
+    #[arg(short, long)]
+    pub one_line: bool,
 
     /// host pattern
     pub pattern: String,
