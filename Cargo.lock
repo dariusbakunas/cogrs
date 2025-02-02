@@ -304,12 +304,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "cogrs-callbacks"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "cogrs-core"
 version = "0.1.0"
 dependencies = [
  "aes",
  "anyhow",
  "cipher",
+ "cogrs-callbacks",
  "ctr",
  "hmac",
  "indexmap",

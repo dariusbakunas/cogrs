@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "cogrs",
+    "cogrs", "cogrs-callbacks",
     "cogrs-core",
     "cogrs-modules",
     "modules/command"

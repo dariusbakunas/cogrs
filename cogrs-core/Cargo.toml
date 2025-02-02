@@ -19,6 +19,7 @@ cipher = "0.5.0-pre.7"
 serde_yaml = "0.9.34"
 serde = { version = "1.0.217", features = ["derive"] }
 log = "0.4.25"
+cogrs-callbacks = { path = "../cogrs-callbacks" }
 
 [dev-dependencies]
 rstest = "0.24.0"
