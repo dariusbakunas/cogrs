@@ -18,7 +18,7 @@ pub struct AdHocOptions {
 }
 
 impl AdHoc {
-    pub fn run(
+    pub async fn run(
         module_name: &str,
         module_args: &str,
         inventory_manager: InventoryManager,
@@ -47,7 +47,7 @@ impl AdHoc {
         let _playbook = Playbook::new(String::from("__adhoc_playbook__"), &[play.clone()]);
 
         let mut tqm = TaskQueueManager::new(options.forks, inventory_manager, variable_manager);
-        tqm.run(&play);
+        tqm.run(&play).await?;
 
         Ok(())
     }

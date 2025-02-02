@@ -1,5 +1,5 @@
 [workspace]
-members = [
+members = [ "callbacks/minimal",
     "cogrs", "cogrs-callbacks",
     "cogrs-core",
     "cogrs-modules",

@@ -36,6 +36,28 @@ builds:
       - x86_64-pc-windows-gnu
       - aarch64-unknown-linux-gnu
       - aarch64-apple-darwin
+  - builder: rust
+    id: minimal-linux
+    binary: libminimal.so
+    flags:
+      - --release
+      - -p=minimal
+    env:
+      - CGO_ENABLED=1
+    targets:
+      - x86_64-unknown-linux-gnu
+      - aarch64-unknown-linux-gnu
+  - builder: rust
+    id: minimal-apple
+    binary: libminimal.dylib
+    flags:
+      - --release
+      - -p=minimal
+    env:
+      - CGO_ENABLED=1
+    targets:
+      - x86_64-apple-darwin
+      - aarch64-apple-darwin
 
 archives:
   - format: tar.gz

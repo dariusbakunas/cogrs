@@ -8,7 +8,7 @@ pub enum Strategy {
 
 #[derive(Clone)]
 pub struct Play {
-    name: String,
+    pub name: String,
     tasks: Vec<Task>,
     use_become: bool,
     become_user: Option<String>,

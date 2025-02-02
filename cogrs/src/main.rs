@@ -10,10 +10,12 @@ async fn main() -> Result<()> {
         env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, "info"),
     );
 
-    run()
+    run().await?;
+
+    Ok(())
 }
 
-fn run() -> Result<()> {
+async fn run() -> Result<()> {
     let cli = Cli::parse();
     let inventory = cli.inventory.as_deref();
 
@@ -39,7 +41,7 @@ fn run() -> Result<()> {
             one_line: cli.one_line,
         };
 
-        AdHoc::run(&module_name, &args, manager, &options)?;
+        AdHoc::run(&module_name, &args, manager, &options).await?;
     } else {
         todo!()
     }
