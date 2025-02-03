@@ -19,7 +19,7 @@ cipher = "0.5.0-pre.7"
 serde_yaml = "0.9.34"
 serde = { version = "1.0.217", features = ["derive"] }
 log = "0.4.25"
-cogrs-callbacks = { path = "../cogrs-callbacks" }
+cogrs-plugins = { path = "../cogrs-plugins" }
 serde_json = "1.0.138"
 tokio = { version = "1.43.0", features = ["full"] }
 futures = "0.3.31"

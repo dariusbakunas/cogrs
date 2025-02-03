@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "cogrs",
-    "cogrs-callbacks",
+    "cogrs-plugins",
     "cogrs-core",
     "cogrs-modules",
     "modules/command",

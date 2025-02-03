@@ -1,6 +1,6 @@
 use anyhow::Result;
-use cogrs_callbacks::CallbackPlugin;
-use cogrs_callbacks::{create_callback_plugin, EventType};
+use cogrs_plugins::CallbackPlugin;
+use cogrs_plugins::{create_callback_plugin, EventType};
 
 create_callback_plugin!(
     MinimalStdOut,
