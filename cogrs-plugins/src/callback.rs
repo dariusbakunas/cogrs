@@ -2,6 +2,11 @@ use serde_json::Value;
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub enum EventType {
+    RunnerOnFailed,
+    RunnerOnOk,
+    RunnerOnSkipped,
+    RunnerOnUnreachable,
+    OnFileDiff,
     PlaybookOnStart,
     PlaybookOnPlayStart,
 }

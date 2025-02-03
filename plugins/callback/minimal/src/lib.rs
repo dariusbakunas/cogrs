@@ -4,16 +4,33 @@ use cogrs_plugins::create_callback_plugin;
 
 create_callback_plugin!(
     MinimalStdOut,
-    [EventType::PlaybookOnStart, EventType::PlaybookOnPlayStart],
-    |event: &EventType, _data: Option<&serde_json::Value>| {
+    [
+        EventType::RunnerOnOk,
+        EventType::RunnerOnFailed,
+        EventType::RunnerOnSkipped,
+        EventType::RunnerOnUnreachable,
+        EventType::OnFileDiff
+    ],
+    |event: &EventType, _data| {
         match event {
-            EventType::PlaybookOnStart => {
-                println!("Playbook started");
+            EventType::RunnerOnOk => {
+                println!("RunnerOnOk");
             }
-            EventType::PlaybookOnPlayStart => {
-                println!("Play started");
+            EventType::RunnerOnFailed => {
+                println!("RunnerOnFailed");
             }
-            _ => println!("Unknown event: {:?}", event),
+            EventType::RunnerOnSkipped => {
+                println!("RunnerOnSkipped");
+            }
+            EventType::RunnerOnUnreachable => {
+                println!("RunnerOnUnreachable");
+            }
+            EventType::OnFileDiff => {
+                println!("OnFileDiff");
+            }
+            _ => {
+                println!("Unknown event");
+            }
         }
 
         Ok(())
