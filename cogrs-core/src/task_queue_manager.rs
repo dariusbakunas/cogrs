@@ -2,7 +2,7 @@ use crate::inventory::manager::InventoryManager;
 use crate::play::Play;
 use crate::vars::VariableManager;
 use anyhow::Result;
-use cogrs_plugins::{CallbackPlugin, EventType};
+use cogrs_plugins::callback::{CallbackPlugin, EventType};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
