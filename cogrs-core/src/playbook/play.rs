@@ -1,4 +1,4 @@
-use crate::task::Task;
+use crate::playbook::task::Task;
 
 #[derive(Clone)]
 pub enum Strategy {

@@ -1,4 +1,8 @@
-use crate::play::Play;
+use play::Play;
+
+pub mod block;
+pub mod play;
+pub mod task;
 
 pub struct Playbook {
     file_name: String,

@@ -1,5 +1,5 @@
 use crate::inventory::manager::InventoryManager;
-use crate::play::Play;
+use crate::playbook::play::Play;
 use crate::vars::VariableManager;
 use anyhow::Result;
 use cogrs_plugins::callback::{CallbackPlugin, EventType};

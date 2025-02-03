@@ -1,8 +1,8 @@
+use crate::executor::task_queue_manager::TaskQueueManager;
 use crate::inventory::manager::InventoryManager;
-use crate::play::Play;
+use crate::playbook::play::Play;
+use crate::playbook::task::{Action, Task};
 use crate::playbook::Playbook;
-use crate::task::{Action, Task};
-use crate::task_queue_manager::TaskQueueManager;
 use crate::vars::VariableManager;
 use anyhow::Result;
 use log::info;
