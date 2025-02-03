@@ -1,7 +1,9 @@
 [workspace]
-members = [ "callbacks/minimal",
-    "cogrs", "cogrs-callbacks",
+members = [
+    "cogrs",
+    "cogrs-callbacks",
     "cogrs-core",
     "cogrs-modules",
-    "modules/command"
+    "modules/command",
+    "plugins/callback/minimal"
 ]
