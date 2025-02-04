@@ -1,9 +1,9 @@
 use super::group::Group;
 use super::host::Host;
 use crate::constants::LOCALHOST;
-use crate::inventory::parser::InventoryParser;
 use crate::inventory::patterns::PatternResolver;
 use crate::inventory::utils::{glob_to_regex, split_subscript};
+use crate::parsing::parser::InventoryParser;
 use anyhow::Result;
 use indexmap::IndexMap;
 use log::warn;

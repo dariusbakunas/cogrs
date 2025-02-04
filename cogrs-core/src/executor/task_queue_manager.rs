@@ -1,6 +1,6 @@
 use crate::inventory::manager::InventoryManager;
 use crate::playbook::play::Play;
-use crate::vars::VariableManager;
+use crate::vars::manager::VariableManager;
 use anyhow::Result;
 use cogrs_plugins::callback::{CallbackPlugin, EventType};
 use serde_json::Value;

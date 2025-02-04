@@ -1,11 +1,8 @@
 pub mod group;
 pub mod host;
 pub mod manager;
-mod parser;
 mod patterns;
 pub mod utils;
-pub mod vars;
-pub mod yml;
 
 use serde_yaml::Value;
 

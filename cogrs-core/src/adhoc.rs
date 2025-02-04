@@ -3,7 +3,7 @@ use crate::inventory::manager::InventoryManager;
 use crate::playbook::play::Play;
 use crate::playbook::task::{Action, Task};
 use crate::playbook::Playbook;
-use crate::vars::VariableManager;
+use crate::vars::manager::VariableManager;
 use anyhow::Result;
 use log::info;
 

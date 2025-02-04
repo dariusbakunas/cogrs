@@ -1,7 +1,7 @@
-use super::group::Group;
-use super::host::Host;
-use super::utils::parse_host_pattern;
-use crate::inventory::vars::Variable;
+use crate::inventory::group::Group;
+use crate::inventory::host::Host;
+use crate::inventory::utils::parse_host_pattern;
+use crate::vars::variable::Variable;
 use anyhow::{bail, Result};
 use indexmap::IndexMap;
 use log::{debug, error, info, warn};

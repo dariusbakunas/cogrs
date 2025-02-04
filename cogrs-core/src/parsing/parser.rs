@@ -1,6 +1,6 @@
 use crate::inventory::group::Group;
 use crate::inventory::host::Host;
-use crate::inventory::yml::parse_yaml_file;
+use crate::parsing::yml::parse_yaml_file;
 use indexmap::IndexMap;
 use log::debug;
 use regex::Regex;
