@@ -6,7 +6,7 @@ use crate::inventory::utils::{glob_to_regex, split_subscript};
 use crate::parsing::parser::InventoryParser;
 use anyhow::Result;
 use indexmap::IndexMap;
-use log::warn;
+use log::{debug, warn};
 use regex::Regex;
 use std::collections::HashSet;
 
@@ -35,6 +35,31 @@ impl InventoryManager {
         }
     }
 
+    fn init_implicit_groups(&mut self) -> Result<()> {
+        self.groups
+            .insert("ungrouped".to_string(), Group::new("ungrouped"));
+        self.groups.insert("all".to_string(), Group::new("all"));
+
+        let mut all_group = self
+            .groups
+            .get_mut("all")
+            .ok_or(anyhow::format_err!("Could not find 'all' group"))?
+            .clone();
+
+        let mut ungrouped_group = self
+            .groups
+            .get_mut("ungrouped")
+            .ok_or(anyhow::format_err!("Could not find 'ungrouped' group"))?
+            .clone();
+
+        all_group.add_child_group(&mut ungrouped_group, &mut self.groups, &mut self.hosts)?;
+        self.groups.insert(all_group.name.clone(), all_group);
+        self.groups
+            .insert(ungrouped_group.name.clone(), ungrouped_group);
+
+        Ok(())
+    }
+
     pub fn get_host(&self, name: &str) -> Option<&Host> {
         let host = self.hosts.get(name);
 
@@ -45,11 +70,47 @@ impl InventoryManager {
         host
     }
 
+    fn reconcile_inventory(&mut self) -> Result<()> {
+        debug!("Reconcile groups and hosts in inventory");
+        let mut children_to_add: Vec<String> = Vec::new();
+
+        for (group_name, group) in self.groups.iter() {
+            // ensure all top level groups inherit from 'all'
+            if !group_name.eq("all") && !group.has_ancestors() {
+                children_to_add.push(group.name.clone());
+            }
+        }
+
+        let mut all_group = self
+            .groups
+            .get_mut("all")
+            .ok_or(anyhow::format_err!("Could not find 'all' group"))?
+            .clone();
+        for group in children_to_add {
+            let mut group = self
+                .groups
+                .get_mut(&group)
+                .ok_or(anyhow::format_err!("Could not find {group} group"))?
+                .clone();
+
+            all_group.add_child_group(&mut group, &mut self.groups, &mut self.hosts)?;
+            self.groups.insert(group.name.clone(), group);
+        }
+
+        self.groups.insert(all_group.name.clone(), all_group);
+
+        Ok(())
+    }
+
     pub fn parse_sources(&mut self, sources: Option<&[String]>) -> Result<()> {
-        if let Some(sources) = sources.as_ref() {
+        self.init_implicit_groups()?;
+
+        if let Some(sources) = sources {
             for source in sources.iter() {
                 InventoryParser::parse_source(source, &mut self.groups, &mut self.hosts)?;
             }
+
+            self.reconcile_inventory()?
         }
 
         Ok(())

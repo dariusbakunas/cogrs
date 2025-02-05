@@ -118,6 +118,14 @@ impl Group {
         relationships
     }
 
+    pub fn has_ancestors(&self) -> bool {
+        self.parent_groups.len() > 0
+    }
+
+    pub fn has_descendants(&self) -> bool {
+        self.child_groups.len() > 0
+    }
+
     pub fn get_ancestors(
         &self,
         groups: &IndexMap<String, Group>,
