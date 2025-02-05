@@ -37,6 +37,13 @@ impl Group {
         }
     }
 
+    pub fn remove_host(&mut self, host_name: &str) {
+        let name = host_name.to_string();
+        if self.hosts.contains(&name) {
+            self.hosts.retain(|h| h != &name);
+        }
+    }
+
     pub fn get_hosts(
         &self,
         groups: &IndexMap<String, Group>,
@@ -59,6 +66,10 @@ impl Group {
             }
         }
         Ok(hosts)
+    }
+
+    pub fn has_child_group(&self, group_name: &str) -> bool {
+        self.child_groups.contains(&group_name.to_string())
     }
 
     pub fn set_priority(&mut self, priority: i64) {
@@ -226,6 +237,10 @@ impl Group {
         } else {
             self.vars.insert(key.to_string(), value);
         }
+    }
+
+    pub fn get_vars(&self) -> &IndexMap<String, Variable> {
+        &self.vars
     }
 
     fn check_children_depth(&self, groups: &mut IndexMap<String, Group>) -> Result<()> {

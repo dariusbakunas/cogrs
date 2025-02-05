@@ -1,6 +1,7 @@
 use anyhow::bail;
 use indexmap::IndexMap;
 use serde_yaml::Value;
+use std::ops::Index;
 
 pub type Sequence = Vec<Variable>;
 
@@ -32,6 +33,19 @@ pub enum Variable {
     Sequence(Sequence),
     Mapping(Mapping),
     String(String),
+}
+
+pub fn combine_variables(
+    a: &IndexMap<String, Variable>,
+    b: &IndexMap<String, Variable>,
+) -> IndexMap<String, Variable> {
+    let mut result = a.clone();
+
+    // default behavior in Ansible is 'replace'
+    for (key, value) in b {
+        result.insert(key.clone(), value.clone());
+    }
+    result
 }
 
 impl TryFrom<&serde_yaml::Value> for Variable {
@@ -78,6 +92,72 @@ mod tests {
     use super::*;
     use serde_yaml::value::{Mapping as YamlMapping, Tag, TaggedValue};
     use serde_yaml::Value;
+
+    #[test]
+    fn test_combine_no_conflicts() {
+        let mut map_a = IndexMap::new();
+        map_a.insert("key1".to_string(), Variable::Bool(true));
+        let mut map_b = IndexMap::new();
+        map_b.insert("key2".to_string(), Variable::String("hello".to_string()));
+
+        let result = combine_variables(&map_a, &map_b);
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result["key1"], Variable::Bool(true));
+        assert_eq!(result["key2"], Variable::String("hello".to_string()));
+    }
+
+    #[test]
+    fn test_combine_with_conflicts() {
+        let mut map_a = IndexMap::new();
+        map_a.insert("key1".to_string(), Variable::Bool(true));
+        map_a.insert("key2".to_string(), Variable::Number(Number::Int(10)));
+
+        let mut map_b = IndexMap::new();
+        map_b.insert("key2".to_string(), Variable::Number(Number::Float(3.14))); // overwrites key2
+        map_b.insert("key3".to_string(), Variable::String("world".to_string()));
+
+        let result = combine_variables(&map_a, &map_b);
+
+        assert_eq!(result.len(), 3);
+        assert_eq!(result["key1"], Variable::Bool(true));
+        assert_eq!(result["key2"], Variable::Number(Number::Float(3.14))); // Overwritten value
+        assert_eq!(result["key3"], Variable::String("world".to_string()));
+    }
+
+    #[test]
+    fn test_combine_empty_maps() {
+        let map_a: IndexMap<String, Variable> = IndexMap::new();
+        let map_b: IndexMap<String, Variable> = IndexMap::new();
+        let result = combine_variables(&map_a, &map_b);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_combine_with_empty_b() {
+        let mut map_a = IndexMap::new();
+        map_a.insert("key1".to_string(), Variable::Bool(true));
+
+        let map_b: IndexMap<String, Variable> = IndexMap::new();
+
+        let result = combine_variables(&map_a.clone(), &map_b);
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result["key1"], map_a["key1"]);
+    }
+
+    #[test]
+    fn test_combine_with_empty_a() {
+        let map_a: IndexMap<String, Variable> = IndexMap::new();
+
+        let mut map_b = IndexMap::new();
+        map_b.insert("key1".to_string(), Variable::Number(Number::Int(5)));
+
+        let result = combine_variables(&map_a, &map_b.clone());
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result["key1"], map_b["key1"]);
+    }
 
     #[test]
     fn test_null_conversion() {

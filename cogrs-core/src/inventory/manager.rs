@@ -4,6 +4,7 @@ use crate::constants::LOCALHOST;
 use crate::inventory::patterns::PatternResolver;
 use crate::inventory::utils::{glob_to_regex, split_subscript};
 use crate::parsing::parser::InventoryParser;
+use crate::vars::variable::combine_variables;
 use anyhow::Result;
 use indexmap::IndexMap;
 use log::{debug, warn};
@@ -70,13 +71,11 @@ impl InventoryManager {
         host
     }
 
-    fn reconcile_inventory(&mut self) -> Result<()> {
-        debug!("Reconcile groups and hosts in inventory");
-        let mut children_to_add: Vec<String> = Vec::new();
+    fn ensure_top_level_groups_inherit_all(&mut self) -> Result<()> {
+        let mut children_to_add = Vec::new();
 
-        for (group_name, group) in self.groups.iter() {
-            // ensure all top level groups inherit from 'all'
-            if !group_name.eq("all") && !group.has_ancestors() {
+        for (group_name, group) in &self.groups {
+            if group_name != "all" && !group.has_ancestors() {
                 children_to_add.push(group.name.clone());
             }
         }
@@ -84,13 +83,14 @@ impl InventoryManager {
         let mut all_group = self
             .groups
             .get_mut("all")
-            .ok_or(anyhow::format_err!("Could not find 'all' group"))?
+            .ok_or_else(|| anyhow::format_err!("Could not find 'all' group"))?
             .clone();
-        for group in children_to_add {
+
+        for group_name in children_to_add {
             let mut group = self
                 .groups
-                .get_mut(&group)
-                .ok_or(anyhow::format_err!("Could not find {group} group"))?
+                .get_mut(&group_name)
+                .ok_or_else(|| anyhow::format_err!("Could not find '{}' group", group_name))?
                 .clone();
 
             all_group.add_child_group(&mut group, &mut self.groups, &mut self.hosts)?;
@@ -98,6 +98,47 @@ impl InventoryManager {
         }
 
         self.groups.insert(all_group.name.clone(), all_group);
+        Ok(())
+    }
+
+    fn update_hosts_with_group_relationships(&mut self) -> Result<()> {
+        let all_group = self
+            .groups
+            .get("all")
+            .ok_or_else(|| anyhow::format_err!("Could not find 'all' group"))?
+            .clone();
+
+        let ungrouped_group = self
+            .groups
+            .get_mut("ungrouped")
+            .ok_or_else(|| anyhow::format_err!("Could not find 'ungrouped' group"))?;
+
+        for host in self.hosts.values_mut() {
+            let host_groups: HashSet<&String> = host.get_groups().into_iter().collect();
+
+            if host_groups.contains(&String::from("ungrouped")) && host_groups.len() > 2 {
+                ungrouped_group.remove_host(&host.name);
+            } else if !host.is_implicit() {
+                if host_groups.is_empty()
+                    || (host_groups.len() == 1 && host_groups.contains(&String::from("all")))
+                {
+                    ungrouped_group.add_host(&host.name);
+                }
+            }
+
+            if host.is_implicit() {
+                let vars = combine_variables(&all_group.get_vars(), &host.get_vars());
+                host.set_vars(vars);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn reconcile_inventory(&mut self) -> Result<()> {
+        debug!("Reconcile groups and hosts in inventory");
+        self.ensure_top_level_groups_inherit_all()?;
+        self.update_hosts_with_group_relationships()?;
 
         Ok(())
     }
@@ -314,6 +355,109 @@ impl InventoryManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_ensure_top_level_groups_inherit_all_success() {
+        let mut inventory_manager = InventoryManager::new();
+
+        // Add initial groups
+        inventory_manager
+            .groups
+            .insert("all".to_string(), Group::new("all"));
+        inventory_manager
+            .groups
+            .insert("group1".to_string(), Group::new("group1"));
+        inventory_manager
+            .groups
+            .insert("group2".to_string(), Group::new("group2"));
+
+        // Groups without ancestors should inherit "all"
+        inventory_manager
+            .ensure_top_level_groups_inherit_all()
+            .expect("ensure_top_level_groups_inherit_all failed");
+
+        let all_group = inventory_manager.groups.get("all").unwrap();
+        assert!(all_group.has_child_group("group1"));
+        assert!(all_group.has_child_group("group2"));
+    }
+
+    #[test]
+    fn test_ensure_top_level_groups_inherit_all_no_top_level_groups() {
+        let mut inventory_manager = InventoryManager::new();
+
+        // Add only the "all" group
+        inventory_manager
+            .groups
+            .insert("all".to_string(), Group::new("all"));
+
+        // Should run without modifying "all" since there are no top-level groups
+        inventory_manager
+            .ensure_top_level_groups_inherit_all()
+            .expect("ensure_top_level_groups_inherit_all failed");
+
+        let all_group = inventory_manager.groups.get("all").unwrap();
+        assert!(all_group
+            .get_descendants(&inventory_manager.groups, false)
+            .is_empty());
+    }
+
+    #[test]
+    fn test_ensure_top_level_groups_inherit_all_missing_all_group() {
+        let mut inventory_manager = InventoryManager::new();
+
+        // Add some groups without adding "all"
+        inventory_manager
+            .groups
+            .insert("group1".to_string(), Group::new("group1"));
+        inventory_manager
+            .groups
+            .insert("group2".to_string(), Group::new("group2"));
+
+        // Should return an error because "all" group is missing
+        let result = inventory_manager.ensure_top_level_groups_inherit_all();
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Could not find 'all' group"
+        );
+    }
+
+    #[test]
+    fn test_ensure_top_level_groups_inherit_all_groups_with_ancestors() {
+        let mut inventory_manager = InventoryManager::new();
+
+        // Add "all" group and group with an ancestor
+        let all_group = Group::new("all");
+        let mut group1 = Group::new("group1");
+        let mut sub_group = Group::new("sub_group");
+
+        group1
+            .add_child_group(
+                &mut sub_group,
+                &mut inventory_manager.groups,
+                &mut inventory_manager.hosts,
+            )
+            .expect("Failed to add child group");
+
+        inventory_manager
+            .groups
+            .insert("all".to_string(), all_group);
+        inventory_manager
+            .groups
+            .insert("group1".to_string(), group1);
+        inventory_manager
+            .groups
+            .insert("sub_group".to_string(), sub_group);
+
+        // Group `sub_group` has an ancestor, so it should not be added to "all"
+        inventory_manager
+            .ensure_top_level_groups_inherit_all()
+            .expect("ensure_top_level_groups_inherit_all failed");
+
+        let all_group = inventory_manager.groups.get("all").unwrap();
+        assert!(all_group.has_child_group("group1"));
+        assert!(!all_group.has_child_group("sub_group"));
+    }
 
     #[test]
     fn test_apply_subscript_single_positive_index() {
