@@ -2,7 +2,7 @@ use crate::inventory::host::Host;
 use crate::inventory::utils::difference_update_vec;
 use crate::vars::variable::Variable;
 use anyhow::{bail, Result};
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use log::{debug, warn};
 use std::collections::HashSet;
 
@@ -72,7 +72,7 @@ impl Group {
         include_self: bool,
     ) -> Vec<String> {
         let mut seen = HashSet::new();
-        let mut to_process: HashSet<String> = if parent {
+        let mut to_process: IndexSet<String> = if parent {
             self.parent_groups.iter().cloned().collect()
         } else {
             self.child_groups.iter().cloned().collect()
@@ -91,7 +91,7 @@ impl Group {
         while !to_process.is_empty() {
             seen.extend(to_process.iter().cloned());
 
-            let mut new_to_process = HashSet::new();
+            let mut new_to_process = IndexSet::new();
 
             for group_name in &to_process {
                 if let Some(group) = groups.get(group_name) {

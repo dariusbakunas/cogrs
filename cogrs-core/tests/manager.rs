@@ -101,8 +101,8 @@ fn load_patterns_from_file_test() -> Result<()> {
 }
 
 #[rstest]
-#[case("basic.yaml", vec!["ungrouped", "webservers", "dbservers"])]
-#[case("basic_relationships.yaml", vec!["ungrouped", "webservers", "dbservers", "east", "west", "prod", "test"])]
+#[case("basic.yaml", vec!["ungrouped", "all", "webservers", "dbservers"])]
+#[case("basic_relationships.yaml", vec!["ungrouped", "all", "webservers", "dbservers", "east", "west", "prod", "test"])]
 fn validate_inventory_groups(
     #[case] inventory: &str,
     #[case] expected_groups: Vec<&str>,
