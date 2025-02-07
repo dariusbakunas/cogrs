@@ -27,6 +27,10 @@ impl Host {
         self.vars = vars;
     }
 
+    pub fn set_var(&mut self, key: &str, value: &Variable) {
+        self.vars.insert(key.to_string(), value.clone());
+    }
+
     pub fn is_implicit(&self) -> bool {
         self.implicit
     }

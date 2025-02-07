@@ -2,10 +2,15 @@ ungrouped:
   hosts:
     mail.example.com:
 webservers:
+  vars:
+    port: 8080
   hosts:
     foo.example.com:
     bar.example.com:
+      port: 4443
 dbservers:
+  vars:
+    port: 3306
   hosts:
     one.example.com:
     two.example.com:

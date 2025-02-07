@@ -1,6 +1,6 @@
 use crate::inventory::host::Host;
 use crate::inventory::utils::difference_update_vec;
-use crate::vars::variable::Variable;
+use crate::vars::variable::{combine_variables, Variable};
 use anyhow::{bail, Result};
 use indexmap::{IndexMap, IndexSet};
 use log::{debug, warn};
@@ -241,6 +241,15 @@ impl Group {
 
     pub fn get_vars(&self) -> &IndexMap<String, Variable> {
         &self.vars
+    }
+
+    pub fn set_vars(&mut self, vars: &IndexMap<String, Variable>) {
+        self.vars = vars.clone();
+    }
+
+    pub fn combine_vars(&mut self, vars: &IndexMap<String, Variable>) {
+        let combined = combine_variables(&self.vars, vars);
+        self.vars = combined;
     }
 
     fn check_children_depth(&self, groups: &mut IndexMap<String, Group>) -> Result<()> {

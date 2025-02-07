@@ -4,7 +4,7 @@ use crate::constants::LOCALHOST;
 use crate::inventory::patterns::PatternResolver;
 use crate::inventory::utils::{glob_to_regex, split_subscript};
 use crate::parsing::parser::InventoryParser;
-use crate::vars::variable::combine_variables;
+use crate::vars::variable::{combine_variables, get_vars_from_inventory_sources};
 use anyhow::Result;
 use indexmap::IndexMap;
 use log::{debug, warn};
@@ -152,6 +152,14 @@ impl InventoryManager {
             }
 
             self.reconcile_inventory()?
+        }
+
+        // TODO: combine vars for groups and hosts
+        for group in self.groups.values_mut() {
+            let vars = get_vars_from_inventory_sources(sources)?;
+            if !vars.is_empty() {
+                group.combine_vars(&vars);
+            }
         }
 
         Ok(())

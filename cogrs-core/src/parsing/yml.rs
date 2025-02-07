@@ -2,7 +2,7 @@ use crate::inventory::group::Group;
 use crate::inventory::host::Host;
 use crate::inventory::utils::parse_host_pattern;
 use crate::vars::variable::Variable;
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use indexmap::IndexMap;
 use log::{debug, error, info, warn};
 use serde_yaml;
@@ -34,7 +34,7 @@ pub fn parse_yaml_file(
             for (key, val) in group_map {
                 if let Value::String(group_name) = key {
                     if let Value::Mapping(group_data) = val {
-                        parse_group(&group_name, &group_data, groups, hosts)?;
+                        parse_group(&group_name, &group_data, groups, hosts, file_path)?;
                     } else {
                         error!(
                             "YAML group has invalid structure, it should be a dictionary, got: {}",
@@ -60,6 +60,7 @@ fn parse_group(
     data: &serde_yaml::Mapping,
     groups: &mut IndexMap<String, Group>,
     hosts: &mut IndexMap<String, Host>,
+    source: &Path,
 ) -> anyhow::Result<()> {
     debug!("Parsing {group_name} group");
 
@@ -75,7 +76,7 @@ fn parse_group(
             if let Value::String(key) = key {
                 match key.as_str() {
                     "vars" => parse_group_vars(group, val)?,
-                    "hosts" => parse_group_hosts(group, val, hosts)?,
+                    "hosts" => parse_group_hosts(group, val, hosts, source)?,
                     "children" => parse_group_children(&current_group_name, val, &mut group_stack)?,
                     _ => log_unexpected_key(key, &current_group_name),
                 }
@@ -128,14 +129,45 @@ fn parse_group_vars(group: &mut Group, val: &Value) -> Result<()> {
     Ok(())
 }
 
+fn populate_host_vars(
+    host: &mut Host,
+    group: &mut Group,
+    vars: &Value,
+    source: &Path,
+) -> Result<()> {
+    let parent = source
+        .parent()
+        .map(|p| p.to_str().unwrap_or(""))
+        .ok_or(anyhow!("Invalid inventory source path: {:?}", source))?;
+
+    if let Some(source) = source.to_str() {
+        host.set_var("inventory_file", &Variable::String(source.to_string()));
+        host.set_var("inventory_dir", &Variable::String(parent.to_string()));
+    } else {
+        host.set_var("inventory_file", &Variable::Null);
+        host.set_var("inventory_dir", &Variable::Null);
+    }
+
+    let value = Variable::try_from(vars)?;
+
+    if let Variable::Mapping(value) = value {
+        for (key, val) in value.iter() {
+            host.set_var(key, &val);
+        }
+    }
+
+    Ok(())
+}
+
 /// Parses "hosts" for the group.
 fn parse_group_hosts(
     group: &mut Group,
     val: &Value,
     hosts: &mut IndexMap<String, Host>,
-) -> anyhow::Result<()> {
+    source: &Path,
+) -> Result<()> {
     if let Value::Mapping(val) = val {
-        for (host_key, _) in val {
+        for (host_key, host_data) in val {
             if let Value::String(host_pattern) = host_key {
                 let new_hosts = parse_host_pattern(host_pattern)?;
                 for host_name in new_hosts {
@@ -143,7 +175,8 @@ fn parse_group_hosts(
                         .entry(host_name.to_string())
                         .or_insert_with(|| Host::new(&host_name));
                     group.add_host(&host.name);
-                    host.add_group(&group.name)
+                    host.add_group(&group.name);
+                    populate_host_vars(host, group, host_data, source);
                 }
             }
         }

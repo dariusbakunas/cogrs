@@ -1,7 +1,8 @@
 use anyhow::bail;
+use anyhow::Result;
 use indexmap::IndexMap;
 use serde_yaml::Value;
-use std::ops::Index;
+use std::path::Path;
 
 pub type Sequence = Vec<Variable>;
 
@@ -25,6 +26,35 @@ pub struct Mapping {
     map: IndexMap<String, Variable>,
 }
 
+impl Mapping {
+    pub fn iter(&self) -> MappingIter<'_> {
+        MappingIter {
+            inner: self.map.iter(),
+        }
+    }
+}
+
+pub struct MappingIter<'a> {
+    inner: indexmap::map::Iter<'a, String, Variable>,
+}
+
+impl<'a> Iterator for MappingIter<'a> {
+    type Item = (&'a String, &'a Variable);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
+impl<'a> IntoIterator for &'a Mapping {
+    type Item = (&'a String, &'a Variable);
+    type IntoIter = MappingIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Variable {
     Null,
@@ -33,6 +63,38 @@ pub enum Variable {
     Sequence(Sequence),
     Mapping(Mapping),
     String(String),
+}
+
+pub fn get_vars_from_path(path: &Path) -> Result<IndexMap<String, Variable>> {
+    todo!()
+}
+
+pub fn get_vars_from_inventory_sources(
+    sources: Option<&[String]>,
+) -> Result<IndexMap<String, Variable>> {
+    let mut vars = IndexMap::new();
+
+    if let Some(sources) = sources {
+        for source in sources {
+            // TODO: revisit this logic, what if its real path and host separated by comma?
+            if source.contains(",") {
+                continue;
+            }
+
+            let mut path = Path::new(source);
+
+            if !path.is_dir() {
+                path = path.parent().ok_or(anyhow::format_err!(
+                    "Invalid inventory source path: {}",
+                    source
+                ))?;
+            }
+
+            //vars = combine_variables(&vars, &get_vars_from_path(path)?);
+        }
+    }
+
+    Ok(vars)
 }
 
 pub fn combine_variables(
