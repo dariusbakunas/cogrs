@@ -10,28 +10,25 @@ use indexmap::IndexMap;
 use log::{debug, warn};
 use regex::Regex;
 use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 
 pub struct HostManager;
 
 pub struct InventoryManager {
+    base_dir: PathBuf,
     groups: IndexMap<String, Group>,
     hosts: IndexMap<String, Host>,
     localhost: Host,
 }
 
-impl Default for InventoryManager {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl InventoryManager {
-    pub fn new() -> Self {
+    pub fn new(base_dir: &PathBuf) -> Self {
         let localhost = Host::new("localhost");
 
         InventoryManager {
             groups: IndexMap::new(),
             hosts: IndexMap::new(),
+            base_dir: base_dir.to_path_buf(),
             localhost,
         }
     }
@@ -69,6 +66,10 @@ impl InventoryManager {
         }
 
         host
+    }
+
+    pub fn get_base_dir(&self) -> &PathBuf {
+        &self.base_dir
     }
 
     fn ensure_top_level_groups_inherit_all(&mut self) -> Result<()> {
@@ -364,9 +365,16 @@ impl InventoryManager {
 mod tests {
     use super::*;
 
+    fn get_base_dir() -> PathBuf {
+        let mut base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        base_dir.push("tests/inventory");
+        base_dir
+    }
+
     #[test]
     fn test_ensure_top_level_groups_inherit_all_success() {
-        let mut inventory_manager = InventoryManager::new();
+        let base_dir = get_base_dir();
+        let mut inventory_manager = InventoryManager::new(&base_dir);
 
         // Add initial groups
         inventory_manager
@@ -391,7 +399,8 @@ mod tests {
 
     #[test]
     fn test_ensure_top_level_groups_inherit_all_no_top_level_groups() {
-        let mut inventory_manager = InventoryManager::new();
+        let base_dir = get_base_dir();
+        let mut inventory_manager = InventoryManager::new(&base_dir);
 
         // Add only the "all" group
         inventory_manager
@@ -411,7 +420,8 @@ mod tests {
 
     #[test]
     fn test_ensure_top_level_groups_inherit_all_missing_all_group() {
-        let mut inventory_manager = InventoryManager::new();
+        let base_dir = get_base_dir();
+        let mut inventory_manager = InventoryManager::new(&base_dir);
 
         // Add some groups without adding "all"
         inventory_manager
@@ -432,7 +442,8 @@ mod tests {
 
     #[test]
     fn test_ensure_top_level_groups_inherit_all_groups_with_ancestors() {
-        let mut inventory_manager = InventoryManager::new();
+        let base_dir = get_base_dir();
+        let mut inventory_manager = InventoryManager::new(&base_dir);
 
         // Add "all" group and group with an ancestor
         let all_group = Group::new("all");
@@ -469,7 +480,9 @@ mod tests {
 
     #[test]
     fn test_apply_subscript_single_positive_index() {
-        let inventory_manager = InventoryManager::new();
+        let base_dir = get_base_dir();
+        let mut inventory_manager = InventoryManager::new(&base_dir);
+
         let hosts = vec![
             "host1".to_string(),
             "host2".to_string(),
@@ -482,7 +495,9 @@ mod tests {
 
     #[test]
     fn test_apply_subscript_single_negative_index() {
-        let inventory_manager = InventoryManager::new();
+        let base_dir = get_base_dir();
+        let mut inventory_manager = InventoryManager::new(&base_dir);
+
         let hosts = vec![
             "host1".to_string(),
             "host2".to_string(),
@@ -495,7 +510,9 @@ mod tests {
 
     #[test]
     fn test_apply_subscript_range_positive_indices() {
-        let inventory_manager = InventoryManager::new();
+        let base_dir = get_base_dir();
+        let mut inventory_manager = InventoryManager::new(&base_dir);
+
         let hosts = vec![
             "host1".to_string(),
             "host2".to_string(),
@@ -509,7 +526,9 @@ mod tests {
 
     #[test]
     fn test_apply_subscript_range_negative_indices() {
-        let inventory_manager = InventoryManager::new();
+        let base_dir = get_base_dir();
+        let mut inventory_manager = InventoryManager::new(&base_dir);
+
         let hosts = vec![
             "host1".to_string(),
             "host2".to_string(),
@@ -523,7 +542,9 @@ mod tests {
 
     #[test]
     fn test_apply_subscript_single_positive_index_out_of_bounds() {
-        let inventory_manager = InventoryManager::new();
+        let base_dir = get_base_dir();
+        let mut inventory_manager = InventoryManager::new(&base_dir);
+
         let hosts = vec!["host1".to_string(), "host2".to_string()];
 
         let result = inventory_manager.apply_subscript(&hosts, 5, None);
@@ -532,7 +553,9 @@ mod tests {
 
     #[test]
     fn test_apply_subscript_negative_index_out_of_bounds() {
-        let inventory_manager = InventoryManager::new();
+        let base_dir = get_base_dir();
+        let mut inventory_manager = InventoryManager::new(&base_dir);
+
         let hosts = vec!["host1".to_string(), "host2".to_string()];
 
         let result = inventory_manager.apply_subscript(&hosts, -5, None);
@@ -541,7 +564,9 @@ mod tests {
 
     #[test]
     fn test_apply_subscript_range_start_greater_than_end() {
-        let inventory_manager = InventoryManager::new();
+        let base_dir = get_base_dir();
+        let mut inventory_manager = InventoryManager::new(&base_dir);
+
         let hosts = vec![
             "host1".to_string(),
             "host2".to_string(),
@@ -555,7 +580,9 @@ mod tests {
 
     #[test]
     fn test_apply_subscript_empty_hosts() {
-        let inventory_manager = InventoryManager::new();
+        let base_dir = get_base_dir();
+        let mut inventory_manager = InventoryManager::new(&base_dir);
+
         let hosts: Vec<String> = vec![];
 
         let result = inventory_manager.apply_subscript(&hosts, 0, Some(1));
@@ -564,7 +591,9 @@ mod tests {
 
     #[test]
     fn test_apply_subscript_full_range() {
-        let inventory_manager = InventoryManager::new();
+        let base_dir = get_base_dir();
+        let mut inventory_manager = InventoryManager::new(&base_dir);
+
         let hosts = vec![
             "host1".to_string(),
             "host2".to_string(),
@@ -586,7 +615,9 @@ mod tests {
 
     #[test]
     fn test_apply_subscript_with_infinite_end() {
-        let inventory_manager = InventoryManager::new();
+        let base_dir = get_base_dir();
+        let mut inventory_manager = InventoryManager::new(&base_dir);
+
         let hosts = vec![
             "host1".to_string(),
             "host2".to_string(),
@@ -600,7 +631,9 @@ mod tests {
 
     #[test]
     fn test_apply_subscript_negative_to_infinite_range() {
-        let inventory_manager = InventoryManager::new();
+        let base_dir = get_base_dir();
+        let mut inventory_manager = InventoryManager::new(&base_dir);
+
         let hosts = vec![
             "host1".to_string(),
             "host2".to_string(),

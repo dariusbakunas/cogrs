@@ -1,4 +1,5 @@
 use clap::Parser;
+use std::fs;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
@@ -33,6 +34,9 @@ pub struct Cli {
     #[arg(short = 'B', long, value_name = "SECONDS")]
     pub async_val: Option<u64>,
 
+    #[arg(long, value_name = "BASEDIR", value_parser, default_value = ".")]
+    pub playbook_dir: PathBuf,
+
     #[arg(
         short = 'P',
         long = "poll",
@@ -54,4 +58,11 @@ pub struct Cli {
     /// specify playbook you want to run
     #[arg(short, long, value_name = "FILE", group = "action")]
     pub playbook: Option<PathBuf>,
+}
+
+impl Cli {
+    /// Resolves the playbook_dir to an absolute path
+    pub fn resolved_playbook_dir(&self) -> PathBuf {
+        fs::canonicalize(&self.playbook_dir).unwrap_or_else(|_| self.playbook_dir.clone())
+    }
 }

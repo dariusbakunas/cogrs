@@ -18,8 +18,9 @@ async fn main() -> Result<()> {
 async fn run() -> Result<()> {
     let cli = Cli::parse();
     let inventory = cli.inventory.as_deref();
+    let playbook_dir = cli.resolved_playbook_dir();
 
-    let mut manager = manager::InventoryManager::new();
+    let mut manager = manager::InventoryManager::new(&playbook_dir);
     manager.parse_sources(inventory)?;
 
     if cli.list_hosts {
@@ -41,7 +42,7 @@ async fn run() -> Result<()> {
             one_line: cli.one_line,
         };
 
-        AdHoc::run(&module_name, &args, manager, &options).await?;
+        AdHoc::run(&module_name, &args, &manager, &options).await?;
     } else {
         todo!()
     }

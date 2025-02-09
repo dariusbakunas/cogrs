@@ -1,3 +1,4 @@
+use crate::playbook::role::Role;
 use crate::playbook::task::Task;
 
 #[derive(Clone)]
@@ -10,6 +11,7 @@ pub enum Strategy {
 pub struct Play {
     pub name: String,
     tasks: Vec<Task>,
+    roles: Vec<Role>,
     use_become: bool,
     become_user: Option<String>,
     check_mode: bool,
@@ -27,6 +29,7 @@ impl Play {
     fn new(
         name: String,
         tasks: Vec<Task>,
+        roles: Vec<Role>,
         use_become: bool,
         become_user: Option<String>,
         check_mode: bool,
@@ -41,6 +44,7 @@ impl Play {
         Play {
             name,
             tasks,
+            roles,
             use_become,
             become_user,
             check_mode,
@@ -54,14 +58,15 @@ impl Play {
         }
     }
 
-    pub fn builder(name: &str, tasks: &[Task]) -> PlayBuilder {
-        PlayBuilder::new(name, tasks)
+    pub fn builder(name: &str, tasks: &[Task], roles: &[Role]) -> PlayBuilder {
+        PlayBuilder::new(name, tasks, roles)
     }
 }
 
 pub struct PlayBuilder {
     name: String,
     tasks: Vec<Task>,
+    roles: Vec<Role>,
     use_become: bool,
     become_user: Option<String>,
     check_mode: bool,
@@ -75,10 +80,11 @@ pub struct PlayBuilder {
 }
 
 impl PlayBuilder {
-    pub fn new(name: &str, tasks: &[Task]) -> PlayBuilder {
+    pub fn new(name: &str, tasks: &[Task], roles: &[Role]) -> PlayBuilder {
         PlayBuilder {
             name: String::from(name),
             tasks: tasks.to_vec(),
+            roles: roles.to_vec(),
             use_become: false,
             become_user: None,
             check_mode: false,
@@ -146,6 +152,7 @@ impl PlayBuilder {
         Play::new(
             self.name,
             self.tasks,
+            self.roles,
             self.use_become,
             self.become_user,
             self.check_mode,

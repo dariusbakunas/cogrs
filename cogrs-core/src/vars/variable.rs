@@ -2,7 +2,7 @@ use anyhow::bail;
 use anyhow::Result;
 use indexmap::IndexMap;
 use serde_yaml::Value;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub type Sequence = Vec<Variable>;
 
@@ -63,6 +63,7 @@ pub enum Variable {
     Sequence(Sequence),
     Mapping(Mapping),
     String(String),
+    Path(PathBuf),
 }
 
 pub fn get_vars_from_path(path: &Path) -> Result<IndexMap<String, Variable>> {

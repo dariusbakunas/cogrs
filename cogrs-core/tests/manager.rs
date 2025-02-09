@@ -3,10 +3,17 @@ use cogrs_core::inventory::manager::InventoryManager;
 use rstest::rstest;
 use std::path::PathBuf;
 
+fn get_base_dir() -> PathBuf {
+    let mut base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    base_dir.push("tests/inventory");
+    base_dir
+}
+
 fn setup_inventory_manager(inventory_file: &str) -> Result<InventoryManager> {
+    let base_dir = get_base_dir();
     let inventory_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/inventory");
     let inventory_path = inventory_dir.join(inventory_file);
-    let mut inventory_manager = InventoryManager::new();
+    let mut inventory_manager = InventoryManager::new(&base_dir);
     let sources = vec![inventory_path.to_str().unwrap().to_string()];
     inventory_manager.parse_sources(Some(&sources))?;
     Ok(inventory_manager)

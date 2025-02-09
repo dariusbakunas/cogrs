@@ -1,3 +1,4 @@
+use crate::executor::play_iterator::PlayIterator;
 use crate::inventory::manager::InventoryManager;
 use crate::playbook::play::Play;
 use crate::vars::manager::VariableManager;
@@ -7,19 +8,19 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-pub struct TaskQueueManager {
+pub struct TaskQueueManager<'a> {
     forks: u32,
     callbacks_loaded: bool,
-    inventory_manager: InventoryManager,
-    variable_manager: VariableManager,
+    inventory_manager: &'a InventoryManager,
+    variable_manager: &'a VariableManager,
     callbacks: HashMap<EventType, Vec<Arc<dyn CallbackPlugin>>>,
 }
 
-impl TaskQueueManager {
+impl<'a> TaskQueueManager<'a> {
     pub fn new(
         forks: u32,
-        inventory_manager: InventoryManager,
-        variable_manager: VariableManager,
+        inventory_manager: &'a InventoryManager,
+        variable_manager: &'a VariableManager,
     ) -> Self {
         Self {
             callbacks: HashMap::new(),
@@ -34,9 +35,13 @@ impl TaskQueueManager {
         self.load_callbacks(
             "/Users/darius/Programming/cogrs/dist/minimal-apple_x86_64-apple-darwin",
         );
+        let all_vars = self
+            .variable_manager
+            .get_vars(play, None, self.inventory_manager);
+
         self.emit_event(EventType::PlaybookOnPlayStart, None).await;
 
-        // TODO:
+        let play_iterator = PlayIterator::new(play);
 
         Ok(())
     }

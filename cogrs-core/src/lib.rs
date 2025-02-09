@@ -4,5 +4,6 @@ pub mod executor;
 pub mod inventory;
 mod parsing;
 pub mod playbook;
+mod template;
 pub mod vars;
 pub mod vault;

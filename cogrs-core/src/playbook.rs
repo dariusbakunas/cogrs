@@ -2,6 +2,7 @@ use play::Play;
 
 pub mod block;
 pub mod play;
+mod role;
 pub mod task;
 
 pub struct Playbook {
