@@ -1,3 +1,4 @@
+use crate::playbook::block::Block;
 use crate::playbook::role::Role;
 use crate::playbook::task::Task;
 
@@ -22,6 +23,8 @@ pub struct Play {
     strategy: Strategy,
     throttle: u32,
     timeout: u32,
+    pattern: String,
+    tags: Vec<String>,
 }
 
 impl Play {
@@ -40,6 +43,8 @@ impl Play {
         strategy: Strategy,
         throttle: u32,
         timeout: u32,
+        pattern: String,
+        tags: Vec<String>,
     ) -> Self {
         Play {
             name,
@@ -55,11 +60,27 @@ impl Play {
             strategy,
             throttle,
             timeout,
+            pattern,
+            tags,
         }
     }
 
     pub fn builder(name: &str, tasks: &[Task], roles: &[Role]) -> PlayBuilder {
         PlayBuilder::new(name, tasks, roles)
+    }
+
+    pub fn get_pattern(&self) -> &str {
+        self.pattern.as_str()
+    }
+
+    pub fn get_tags(&self) -> &Vec<String> {
+        &self.tags
+    }
+
+    pub fn compile(&self) -> Vec<Block> {
+        let blocks = Vec::new();
+
+        blocks
     }
 }
 
@@ -77,6 +98,8 @@ pub struct PlayBuilder {
     strategy: Strategy,
     throttle: u32,
     timeout: u32,
+    pattern: String,
+    tags: Vec<String>,
 }
 
 impl PlayBuilder {
@@ -95,6 +118,8 @@ impl PlayBuilder {
             strategy: Strategy::Linear,
             throttle: 0,
             timeout: 0,
+            pattern: String::from(""),
+            tags: vec![],
         }
     }
 
@@ -148,6 +173,16 @@ impl PlayBuilder {
         self
     }
 
+    pub fn pattern(mut self, pattern: String) -> Self {
+        self.pattern = pattern;
+        self
+    }
+
+    pub fn tags(mut self, tags: Vec<String>) -> Self {
+        self.tags = tags;
+        self
+    }
+
     pub fn build(self) -> Play {
         Play::new(
             self.name,
@@ -163,6 +198,8 @@ impl PlayBuilder {
             self.strategy,
             self.throttle,
             self.timeout,
+            self.pattern,
+            self.tags,
         )
     }
 }

@@ -16,16 +16,18 @@ pub struct TaskQueueManager<'a> {
     callbacks: HashMap<EventType, Vec<Arc<dyn CallbackPlugin>>>,
 }
 
+const DEFAULT_FORKS: u32 = 5;
+
 impl<'a> TaskQueueManager<'a> {
     pub fn new(
-        forks: u32,
+        forks: Option<u32>,
         inventory_manager: &'a InventoryManager,
         variable_manager: &'a VariableManager,
     ) -> Self {
         Self {
             callbacks: HashMap::new(),
             callbacks_loaded: false,
-            forks,
+            forks: forks.unwrap_or(DEFAULT_FORKS),
             inventory_manager,
             variable_manager,
         }
@@ -41,7 +43,8 @@ impl<'a> TaskQueueManager<'a> {
 
         self.emit_event(EventType::PlaybookOnPlayStart, None).await;
 
-        let play_iterator = PlayIterator::new(play);
+        let mut play_iterator = PlayIterator::new();
+        play_iterator.init(play, self.inventory_manager)?;
 
         Ok(())
     }

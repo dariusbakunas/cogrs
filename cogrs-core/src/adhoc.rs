@@ -19,6 +19,7 @@ pub struct AdHocOptions {
 
 impl AdHoc {
     pub async fn run(
+        pattern: &str,
         module_name: &str,
         module_args: &str,
         inventory_manager: &InventoryManager,
@@ -35,6 +36,7 @@ impl AdHoc {
             None,
             options.poll_interval,
             options.async_val,
+            vec![], // TODO: what tags do we use here?
         );
         let tasks = vec![task];
         let roles = [];
@@ -44,11 +46,13 @@ impl AdHoc {
         let play = Play::builder("CogRS Ad-Hoc", &tasks, &roles)
             .use_become(false)
             .gather_facts(false)
+            .pattern(pattern.to_string())
             .build();
 
         let _playbook = Playbook::new(String::from("__adhoc_playbook__"), &[play.clone()]);
 
-        let mut tqm = TaskQueueManager::new(options.forks, inventory_manager, &variable_manager);
+        let mut tqm =
+            TaskQueueManager::new(Some(options.forks), inventory_manager, &variable_manager);
         tqm.run(&play).await?;
 
         Ok(())
