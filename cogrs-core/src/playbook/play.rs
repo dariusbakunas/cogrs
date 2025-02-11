@@ -1,6 +1,8 @@
-use crate::playbook::block::Block;
+use crate::playbook::block::{Block, BlockEntry};
 use crate::playbook::role::Role;
-use crate::playbook::task::Task;
+use crate::playbook::task::{Action, Task, TaskBuilder};
+
+const GATHER_TIMEOUT_DEFAULT: u32 = 10;
 
 #[derive(Clone)]
 pub enum Strategy {
@@ -11,14 +13,19 @@ pub enum Strategy {
 #[derive(Clone)]
 pub struct Play {
     pub name: String,
-    tasks: Vec<Task>,
+    tasks: Vec<BlockEntry>,
+    pre_tasks: Vec<BlockEntry>,
+    post_tasks: Vec<BlockEntry>,
     roles: Vec<Role>,
     use_become: bool,
+    force_handlers: bool,
     become_user: Option<String>,
     check_mode: bool,
     connection: String,
     diff: bool,
     gather_facts: bool,
+    gather_subset: Vec<String>,
+    gather_timeout: u32,
     no_log: bool,
     strategy: Strategy,
     throttle: u32,
@@ -31,14 +38,19 @@ impl Play {
     #[allow(clippy::too_many_arguments)]
     fn new(
         name: String,
-        tasks: Vec<Task>,
+        tasks: Vec<BlockEntry>,
+        pre_tasks: Vec<BlockEntry>,
+        post_tasks: Vec<BlockEntry>,
         roles: Vec<Role>,
         use_become: bool,
         become_user: Option<String>,
+        force_handlers: bool,
         check_mode: bool,
         connection: String,
         diff: bool,
         gather_facts: bool,
+        gather_subset: Vec<String>,
+        gather_timeout: u32,
         no_log: bool,
         strategy: Strategy,
         throttle: u32,
@@ -49,13 +61,18 @@ impl Play {
         Play {
             name,
             tasks,
+            pre_tasks,
+            post_tasks,
             roles,
             use_become,
             become_user,
+            force_handlers,
             check_mode,
             connection,
             diff,
             gather_facts,
+            gather_subset,
+            gather_timeout,
             no_log,
             strategy,
             throttle,
@@ -65,8 +82,8 @@ impl Play {
         }
     }
 
-    pub fn builder(name: &str, tasks: &[Task], roles: &[Role]) -> PlayBuilder {
-        PlayBuilder::new(name, tasks, roles)
+    pub fn builder(name: &str, roles: &[Role]) -> PlayBuilder {
+        PlayBuilder::new(name, roles)
     }
 
     pub fn get_pattern(&self) -> &str {
@@ -77,8 +94,51 @@ impl Play {
         &self.tags
     }
 
-    pub fn compile(&self) -> Vec<Block> {
-        let blocks = Vec::new();
+    fn compile_roles(&self) -> Vec<BlockEntry> {
+        let mut blocks: Vec<BlockEntry> = Vec::new();
+
+        // TODO: compile_rows
+
+        blocks
+    }
+
+    pub fn compile(&self) -> Vec<BlockEntry> {
+        let mut blocks: Vec<BlockEntry> = Vec::new();
+
+        // create a block containing a single flush handlers meta
+        // task, so we can be sure to run handlers at certain points
+        // of the playbook execution
+        let mut flush_block = Block::new();
+
+        let meta_task = TaskBuilder::new(Action::Module(
+            "meta".to_string(),
+            "flush_handlers".to_string(),
+        ))
+        .implicit(true)
+        .build();
+
+        if self.tags.is_empty() {
+            flush_block.add_to_block(BlockEntry::Task(meta_task));
+        } else {
+            // TODO: evaluate tags
+        };
+
+        if self.force_handlers {
+            let noop_task =
+                TaskBuilder::new(Action::Module("meta".to_string(), "noop".to_string()))
+                    .implicit(true)
+                    .build();
+
+            // TODO: add remaining blocks
+        }
+
+        blocks.extend(self.pre_tasks.clone());
+        blocks.push(BlockEntry::Block(Box::new(flush_block.clone())));
+        blocks.extend(self.compile_roles());
+        blocks.extend(self.tasks.clone());
+        blocks.push(BlockEntry::Block(Box::new(flush_block.clone())));
+        blocks.extend(self.post_tasks.clone());
+        blocks.push(BlockEntry::Block(Box::new(flush_block)));
 
         blocks
     }
@@ -86,14 +146,19 @@ impl Play {
 
 pub struct PlayBuilder {
     name: String,
-    tasks: Vec<Task>,
+    tasks: Vec<BlockEntry>,
+    pre_tasks: Vec<BlockEntry>,
+    post_tasks: Vec<BlockEntry>,
     roles: Vec<Role>,
     use_become: bool,
     become_user: Option<String>,
+    force_handlers: bool,
     check_mode: bool,
     connection: String,
     diff: bool,
     gather_facts: bool,
+    gather_subset: Vec<String>,
+    gather_timeout: u32,
     no_log: bool,
     strategy: Strategy,
     throttle: u32,
@@ -103,17 +168,22 @@ pub struct PlayBuilder {
 }
 
 impl PlayBuilder {
-    pub fn new(name: &str, tasks: &[Task], roles: &[Role]) -> PlayBuilder {
+    pub fn new(name: &str, roles: &[Role]) -> PlayBuilder {
         PlayBuilder {
             name: String::from(name),
-            tasks: tasks.to_vec(),
+            tasks: Vec::new(),
+            pre_tasks: Vec::new(),
+            post_tasks: Vec::new(),
             roles: roles.to_vec(),
             use_become: false,
             become_user: None,
+            force_handlers: false,
             check_mode: false,
             connection: String::from("ssh"),
             diff: false,
             gather_facts: false,
+            gather_subset: vec![],
+            gather_timeout: GATHER_TIMEOUT_DEFAULT,
             no_log: false,
             strategy: Strategy::Linear,
             throttle: 0,
@@ -153,6 +223,16 @@ impl PlayBuilder {
         self
     }
 
+    pub fn gather_subset(mut self, subset: Vec<String>) -> Self {
+        self.gather_subset = subset;
+        self
+    }
+
+    pub fn gather_timeout(mut self, timeout: u32) -> Self {
+        self.gather_timeout = timeout;
+        self
+    }
+
     pub fn no_log(mut self, value: bool) -> Self {
         self.no_log = value;
         self
@@ -160,6 +240,18 @@ impl PlayBuilder {
 
     pub fn strategy(mut self, strategy: Strategy) -> Self {
         self.strategy = strategy;
+        self
+    }
+
+    pub fn tasks(mut self, tasks: &[Task]) -> Self {
+        let mut blocks: Vec<BlockEntry> = Vec::new();
+        for task in tasks {
+            let mut block = Block::new();
+            block.set_is_implicit(true);
+            block.add_to_block(BlockEntry::Task(task.clone()));
+            blocks.push(BlockEntry::Block(Box::new(block)));
+        }
+        self.tasks = blocks;
         self
     }
 
@@ -187,13 +279,18 @@ impl PlayBuilder {
         Play::new(
             self.name,
             self.tasks,
+            self.pre_tasks,
+            self.post_tasks,
             self.roles,
             self.use_become,
             self.become_user,
+            self.force_handlers,
             self.check_mode,
             self.connection,
             self.diff,
             self.gather_facts,
+            self.gather_subset,
+            self.gather_timeout,
             self.no_log,
             self.strategy,
             self.throttle,

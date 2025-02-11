@@ -2,12 +2,13 @@ use crate::executor::host_state::HostState;
 use crate::inventory::manager::InventoryManager;
 use crate::playbook::block::{Block, BlockEntry};
 use crate::playbook::play::Play;
-use crate::playbook::task::{Action, Task};
+use crate::playbook::task::{Action, Task, TaskBuilder};
 use anyhow::Result;
+use log::info;
 use std::collections::HashMap;
 
 pub struct PlayIterator {
-    blocks: Vec<Block>,
+    blocks: Vec<BlockEntry>,
     batch_size: u32,
     host_states: HashMap<String, HostState>,
 }
@@ -22,31 +23,31 @@ impl PlayIterator {
     }
 
     pub fn init(&mut self, play: &Play, inventory_manager: &InventoryManager) -> Result<()> {
-        let mut setup_block = Block::new(false);
+        let mut setup_block = Block::new();
         let batch = inventory_manager.filter_hosts(play.get_pattern(), None)?;
         self.batch_size = batch.len() as u32;
 
-        let setup_task = Task::new(
-            "Gathering Facts",
-            &Action::Module("gather_facts".to_string(), "".to_string()),
-            None,
-            None,
-            None,
-            // Unless play is specifically tagged, gathering should 'always' run
-            if play.get_tags().is_empty() {
-                vec!["always".to_string()]
-            } else {
-                vec![]
-            },
-        );
+        let mut setup_task_builder =
+            TaskBuilder::new(Action::Module("setup".to_string(), "".to_string()));
+
+        // Unless play is specifically tagged, gathering should 'always' run
+        if play.get_tags().is_empty() {
+            setup_task_builder = setup_task_builder.tags(vec!["always".to_string()]);
+        }
+
+        let setup_task = setup_task_builder.build();
 
         setup_block.add_to_block(BlockEntry::Task(setup_task));
-        self.blocks.push(setup_block);
+        self.blocks.push(BlockEntry::Block(Box::new(setup_block)));
 
         for block in play.compile() {
             // TODO: filter tagged tasks
-            if block.has_entries() {
-                self.blocks.push(block);
+            if let BlockEntry::Block(block) = block {
+                if block.has_entries() {
+                    self.blocks.push(BlockEntry::Block(block));
+                }
+            } else if let BlockEntry::Task(task) = block {
+                info!("Adding task to play iterator");
             }
         }
 

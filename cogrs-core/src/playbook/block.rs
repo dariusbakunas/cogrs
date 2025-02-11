@@ -12,15 +12,17 @@ pub struct Block {
     rescue: Vec<BlockEntry>,
     always: Vec<BlockEntry>,
     run_once: bool,
+    implicit: bool,
 }
 
 impl Block {
-    pub fn new(run_once: bool) -> Self {
+    pub fn new() -> Self {
         Block {
             block: Vec::new(),
             rescue: Vec::new(),
             always: Vec::new(),
-            run_once,
+            run_once: false,
+            implicit: false,
         }
     }
 
@@ -29,7 +31,7 @@ impl Block {
     }
 
     pub fn has_entries(&self) -> bool {
-        !self.block.is_empty() && !self.rescue.is_empty() && !self.always.is_empty()
+        !self.block.is_empty() || !self.rescue.is_empty() || !self.always.is_empty()
     }
 
     pub fn add_to_block(&mut self, entry: BlockEntry) {
@@ -42,5 +44,9 @@ impl Block {
 
     pub fn add_to_always(&mut self, entry: BlockEntry) {
         self.always.push(entry);
+    }
+
+    pub fn set_is_implicit(&mut self, value: bool) {
+        self.implicit = value;
     }
 }

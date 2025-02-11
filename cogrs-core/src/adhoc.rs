@@ -1,7 +1,8 @@
 use crate::executor::task_queue_manager::TaskQueueManager;
 use crate::inventory::manager::InventoryManager;
+use crate::playbook::block::BlockEntry;
 use crate::playbook::play::Play;
-use crate::playbook::task::{Action, Task};
+use crate::playbook::task::{Action, Task, TaskBuilder};
 use crate::playbook::Playbook;
 use crate::vars::manager::VariableManager;
 use anyhow::Result;
@@ -30,23 +31,24 @@ impl AdHoc {
             module_name, module_args
         );
 
-        let task = Task::new(
-            module_name,
-            &Action::Module(module_name.to_string(), module_args.to_string()),
-            None,
-            options.poll_interval,
-            options.async_val,
-            vec![], // TODO: what tags do we use here?
-        );
+        let task = TaskBuilder::new(Action::Module(
+            module_name.to_string(),
+            module_args.to_string(),
+        ))
+        .poll_interval(options.poll_interval)
+        .async_val(options.async_val)
+        .build();
+
         let tasks = vec![task];
         let roles = [];
 
         let variable_manager = VariableManager::new();
 
-        let play = Play::builder("CogRS Ad-Hoc", &tasks, &roles)
+        let play = Play::builder("CogRS Ad-Hoc", &roles)
             .use_become(false)
             .gather_facts(false)
             .pattern(pattern.to_string())
+            .tasks(&tasks)
             .build();
 
         let _playbook = Playbook::new(String::from("__adhoc_playbook__"), &[play.clone()]);
