@@ -1,10 +1,13 @@
 use crate::executor::play_iterator::PlayIterator;
 use crate::inventory::manager::InventoryManager;
 use crate::playbook::play::Play;
+use crate::strategy::linear::LinearStrategy;
+use crate::strategy::Strategy;
 use crate::vars::manager::VariableManager;
 use anyhow::Result;
 use cogrs_plugins::callback::{CallbackPlugin, EventType};
 use serde_json::Value;
+use std::cmp::min;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -45,6 +48,18 @@ impl<'a> TaskQueueManager<'a> {
 
         let mut play_iterator = PlayIterator::new();
         play_iterator.init(play, self.inventory_manager)?;
+
+        let forks = min(self.forks, play_iterator.get_batch_size());
+
+        match play.get_strategy() {
+            Strategy::Linear => {
+                let strategy = LinearStrategy::new(&self);
+                strategy.run(&play_iterator);
+            }
+            Strategy::Free => {
+                todo!()
+            }
+        }
 
         Ok(())
     }

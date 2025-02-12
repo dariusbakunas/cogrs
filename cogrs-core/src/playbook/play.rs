@@ -1,14 +1,9 @@
 use crate::playbook::block::{Block, BlockEntry};
 use crate::playbook::role::Role;
 use crate::playbook::task::{Action, Task, TaskBuilder};
+use crate::strategy::Strategy;
 
 const GATHER_TIMEOUT_DEFAULT: u32 = 10;
-
-#[derive(Clone)]
-pub enum Strategy {
-    Linear,
-    Free,
-}
 
 #[derive(Clone)]
 pub struct Play {
@@ -92,6 +87,10 @@ impl Play {
 
     pub fn get_tags(&self) -> &Vec<String> {
         &self.tags
+    }
+
+    pub fn get_strategy(&self) -> &Strategy {
+        &self.strategy
     }
 
     fn compile_roles(&self) -> Vec<BlockEntry> {

@@ -1,3 +1,5 @@
+use crate::playbook::block::BlockEntry;
+
 pub enum IteratingState {
     Setup,
     Tasks,
@@ -17,6 +19,7 @@ pub enum FailedState {
 }
 
 pub struct HostState {
+    blocks: Vec<BlockEntry>,
     update_handlers: bool,
     pending_setup: bool,
     did_rescue: bool,
@@ -26,8 +29,9 @@ pub struct HostState {
 }
 
 impl HostState {
-    pub fn new() -> Self {
+    pub fn new(blocks: &[BlockEntry]) -> Self {
         HostState {
+            blocks: blocks.to_vec(),
             update_handlers: false,
             pending_setup: false,
             did_rescue: false,

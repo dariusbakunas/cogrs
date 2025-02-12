@@ -11,6 +11,8 @@ pub struct PlayIterator {
     blocks: Vec<BlockEntry>,
     batch_size: u32,
     host_states: HashMap<String, HostState>,
+    end_play: bool,
+    cur_task: u32,
 }
 
 impl PlayIterator {
@@ -19,6 +21,8 @@ impl PlayIterator {
             blocks: vec![],
             batch_size: 0,
             host_states: HashMap::new(),
+            end_play: false,
+            cur_task: 0,
         }
     }
 
@@ -51,6 +55,17 @@ impl PlayIterator {
             }
         }
 
+        for host in batch {
+            let host_state = HostState::new(&self.blocks);
+            self.host_states.insert(host.name.to_string(), host_state);
+
+            // TODO: handle start_at_task option here
+        }
+
         Ok(())
+    }
+
+    pub fn get_batch_size(&self) -> u32 {
+        self.batch_size
     }
 }
