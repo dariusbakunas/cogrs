@@ -6,5 +6,6 @@ pub mod parsing;
 pub mod playbook;
 pub mod strategy;
 pub mod template;
+pub mod utils;
 pub mod vars;
 pub mod vault;
