@@ -28,7 +28,7 @@ async fn run() -> Result<()> {
         let hosts = manager.filter_hosts(cli.pattern.as_str(), cli.limit.as_deref())?;
         // ansible seems to ignore everything else if --list-hosts is specified?
         for host in hosts {
-            println!("{}", host.name);
+            println!("{}", host.get_name());
         }
     } else if let Some(module_name) = cli.module_name {
         let args = cli
@@ -43,7 +43,15 @@ async fn run() -> Result<()> {
             one_line: cli.one_line,
         };
 
-        AdHoc::run(pattern, &module_name, &args, &manager, &options).await?;
+        AdHoc::run(
+            pattern,
+            cli.limit.as_deref(),
+            &module_name,
+            &args,
+            &manager,
+            &options,
+        )
+        .await?;
     } else {
         todo!()
     }

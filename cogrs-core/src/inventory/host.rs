@@ -3,7 +3,7 @@ use indexmap::IndexMap;
 
 #[derive(Clone, Debug)]
 pub struct Host {
-    pub name: String,
+    name: String,
     implicit: bool,
     vars: IndexMap<String, Variable>,
     groups: Vec<String>,
@@ -21,6 +21,10 @@ impl Host {
 
     pub fn get_vars(&self) -> &IndexMap<String, Variable> {
         &self.vars
+    }
+
+    pub fn get_name(&self) -> &str {
+        &self.name
     }
 
     pub fn set_vars(&mut self, vars: IndexMap<String, Variable>) {

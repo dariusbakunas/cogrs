@@ -1,5 +1,7 @@
-use crate::playbook::block::Block;
 use crate::playbook::role::Role;
+use crate::utils::get_unique_id;
+use std::fmt;
+use std::fmt::Formatter;
 
 #[derive(Clone)]
 pub enum Action {
@@ -8,6 +10,7 @@ pub enum Action {
 
 #[derive(Clone)]
 pub struct Task {
+    uuid: String,
     role: Option<Role>,
     action: Action,
     poll_interval: Option<u64>,
@@ -28,12 +31,27 @@ impl Task {
         tags: Vec<String>,
     ) -> Self {
         Self {
+            uuid: get_unique_id(false),
             action: action.clone(),
             role,
             poll_interval,
             async_val,
             implicit,
             tags,
+        }
+    }
+
+    pub fn get_uuid(&self) -> &str {
+        &self.uuid
+    }
+}
+
+impl fmt::Display for Task {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match &self.action {
+            Action::Module(name, _) => {
+                write!(f, "TASK: {}", name)
+            }
         }
     }
 }

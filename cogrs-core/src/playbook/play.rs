@@ -18,7 +18,8 @@ pub struct Play {
     check_mode: bool,
     connection: String,
     diff: bool,
-    gather_facts: bool,
+    finalized: bool,
+    gather_facts: Option<bool>,
     gather_subset: Vec<String>,
     gather_timeout: u32,
     no_log: bool,
@@ -26,6 +27,7 @@ pub struct Play {
     throttle: u32,
     timeout: u32,
     pattern: String,
+    limit: Option<String>,
     tags: Vec<String>,
 }
 
@@ -43,7 +45,8 @@ impl Play {
         check_mode: bool,
         connection: String,
         diff: bool,
-        gather_facts: bool,
+        finalized: bool,
+        gather_facts: Option<bool>,
         gather_subset: Vec<String>,
         gather_timeout: u32,
         no_log: bool,
@@ -51,6 +54,7 @@ impl Play {
         throttle: u32,
         timeout: u32,
         pattern: String,
+        limit: Option<String>,
         tags: Vec<String>,
     ) -> Self {
         Play {
@@ -65,6 +69,7 @@ impl Play {
             check_mode,
             connection,
             diff,
+            finalized,
             gather_facts,
             gather_subset,
             gather_timeout,
@@ -73,6 +78,7 @@ impl Play {
             throttle,
             timeout,
             pattern,
+            limit,
             tags,
         }
     }
@@ -85,12 +91,32 @@ impl Play {
         self.pattern.as_str()
     }
 
+    pub fn get_limit(&self) -> Option<&str> {
+        self.limit.as_ref().map(|l| l.as_str())
+    }
+
     pub fn get_tags(&self) -> &Vec<String> {
         &self.tags
     }
 
     pub fn get_strategy(&self) -> &Strategy {
         &self.strategy
+    }
+
+    pub fn gather_facts(&self) -> Option<bool> {
+        self.gather_facts
+    }
+
+    pub fn gather_subset(&self) -> &Vec<String> {
+        &self.gather_subset
+    }
+
+    pub fn gather_timeout(&self) -> u32 {
+        self.gather_timeout
+    }
+
+    pub fn is_finalized(&self) -> bool {
+        self.finalized
     }
 
     fn compile_roles(&self) -> Vec<BlockEntry> {
@@ -155,7 +181,8 @@ pub struct PlayBuilder {
     check_mode: bool,
     connection: String,
     diff: bool,
-    gather_facts: bool,
+    finalized: bool,
+    gather_facts: Option<bool>,
     gather_subset: Vec<String>,
     gather_timeout: u32,
     no_log: bool,
@@ -163,6 +190,7 @@ pub struct PlayBuilder {
     throttle: u32,
     timeout: u32,
     pattern: String,
+    limit: Option<String>,
     tags: Vec<String>,
 }
 
@@ -180,14 +208,16 @@ impl PlayBuilder {
             check_mode: false,
             connection: String::from("ssh"),
             diff: false,
-            gather_facts: false,
+            finalized: false,
+            gather_facts: None,
             gather_subset: vec![],
             gather_timeout: GATHER_TIMEOUT_DEFAULT,
             no_log: false,
             strategy: Strategy::Linear,
             throttle: 0,
             timeout: 0,
-            pattern: String::from(""),
+            pattern: String::from("all"),
+            limit: None,
             tags: vec![],
         }
     }
@@ -218,7 +248,7 @@ impl PlayBuilder {
     }
 
     pub fn gather_facts(mut self, value: bool) -> Self {
-        self.gather_facts = value;
+        self.gather_facts = Some(value);
         self
     }
 
@@ -264,13 +294,23 @@ impl PlayBuilder {
         self
     }
 
-    pub fn pattern(mut self, pattern: String) -> Self {
-        self.pattern = pattern;
+    pub fn pattern(mut self, pattern: &str) -> Self {
+        self.pattern = pattern.to_string();
+        self
+    }
+
+    pub fn limit(mut self, limit: Option<&str>) -> Self {
+        self.limit = limit.map(|l| String::from(l));
         self
     }
 
     pub fn tags(mut self, tags: Vec<String>) -> Self {
         self.tags = tags;
+        self
+    }
+
+    pub fn finalized(mut self, value: bool) -> Self {
+        self.finalized = value;
         self
     }
 
@@ -287,6 +327,7 @@ impl PlayBuilder {
             self.check_mode,
             self.connection,
             self.diff,
+            self.finalized,
             self.gather_facts,
             self.gather_subset,
             self.gather_timeout,
@@ -295,6 +336,7 @@ impl PlayBuilder {
             self.throttle,
             self.timeout,
             self.pattern,
+            self.limit,
             self.tags,
         )
     }

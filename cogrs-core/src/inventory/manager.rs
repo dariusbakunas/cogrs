@@ -118,12 +118,12 @@ impl InventoryManager {
             let host_groups: HashSet<&String> = host.get_groups().into_iter().collect();
 
             if host_groups.contains(&String::from("ungrouped")) && host_groups.len() > 2 {
-                ungrouped_group.remove_host(&host.name);
+                ungrouped_group.remove_host(&host.get_name());
             } else if !host.is_implicit() {
                 if host_groups.is_empty()
                     || (host_groups.len() == 1 && host_groups.contains(&String::from("all")))
                 {
-                    ungrouped_group.add_host(&host.name);
+                    ungrouped_group.add_host(&host.get_name());
                 }
             }
 

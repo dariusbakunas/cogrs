@@ -174,7 +174,7 @@ fn parse_group_hosts(
                     let host = hosts
                         .entry(host_name.to_string())
                         .or_insert_with(|| Host::new(&host_name));
-                    group.add_host(&host.name);
+                    group.add_host(&host.get_name());
                     host.add_group(&group.name);
                     populate_host_vars(host, group, host_data, source);
                 }

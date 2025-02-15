@@ -1,7 +1,6 @@
 use crate::executor::failed_state::FailedStates;
 use crate::playbook::block::BlockEntry;
 use std::cmp::PartialEq;
-use std::ops::{BitAnd, BitOr};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum IteratingState {

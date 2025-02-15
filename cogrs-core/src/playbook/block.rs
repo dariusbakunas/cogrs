@@ -1,4 +1,5 @@
 use crate::playbook::task::Task;
+use crate::utils::get_unique_id;
 
 #[derive(Clone)]
 pub enum BlockEntry {
@@ -13,11 +14,13 @@ pub struct Block {
     always: Vec<BlockEntry>,
     run_once: bool,
     implicit: bool,
+    uuid: String,
 }
 
 impl Block {
     pub fn new() -> Self {
         Block {
+            uuid: get_unique_id(false),
             block: Vec::new(),
             rescue: Vec::new(),
             always: Vec::new(),
@@ -30,8 +33,24 @@ impl Block {
         self.block = entries;
     }
 
-    pub fn has_entries(&self) -> bool {
+    pub fn has_rescue_entries(&self) -> bool {
+        !self.rescue.is_empty()
+    }
+
+    pub fn has_always_entries(&self) -> bool {
+        !self.always.is_empty()
+    }
+
+    pub fn has_any_entries(&self) -> bool {
         !self.block.is_empty() || !self.rescue.is_empty() || !self.always.is_empty()
+    }
+
+    pub fn has_block_entries(&self) -> bool {
+        !self.block.is_empty()
+    }
+
+    pub fn get_block_entry(&self, index: usize) -> Option<&BlockEntry> {
+        self.block.get(index)
     }
 
     pub fn add_to_block(&mut self, entry: BlockEntry) {

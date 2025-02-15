@@ -39,7 +39,7 @@ fn validate_hosts(
     expected_hosts: &[&str],
 ) -> Result<()> {
     let hosts = inventory_manager.filter_hosts(pattern, limit)?;
-    let actual_names: Vec<String> = hosts.iter().map(|h| h.name.clone()).collect();
+    let actual_names: Vec<String> = hosts.iter().map(|h| h.get_name().to_string()).collect();
 
     if actual_names != expected_hosts {
         panic!(

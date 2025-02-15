@@ -21,6 +21,7 @@ pub struct AdHocOptions {
 impl AdHoc {
     pub async fn run(
         pattern: &str,
+        limit: Option<&str>,
         module_name: &str,
         module_args: &str,
         inventory_manager: &InventoryManager,
@@ -47,7 +48,8 @@ impl AdHoc {
         let play = Play::builder("CogRS Ad-Hoc", &roles)
             .use_become(false)
             .gather_facts(false)
-            .pattern(pattern.to_string())
+            .pattern(pattern)
+            .limit(limit)
             .tasks(&tasks)
             .build();
 

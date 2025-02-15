@@ -1,4 +1,5 @@
 use crate::executor::play_iterator::PlayIterator;
+use crate::inventory::host::Host;
 use crate::inventory::manager::InventoryManager;
 use crate::playbook::play::Play;
 use crate::strategy::linear::LinearStrategy;
@@ -17,6 +18,8 @@ pub struct TaskQueueManager<'a> {
     inventory_manager: &'a InventoryManager,
     variable_manager: &'a VariableManager,
     callbacks: HashMap<EventType, Vec<Arc<dyn CallbackPlugin>>>,
+    terminated: bool,
+    unreachable_hosts: HashMap<String, Host>,
 }
 
 const DEFAULT_FORKS: u32 = 5;
@@ -33,7 +36,13 @@ impl<'a> TaskQueueManager<'a> {
             forks: forks.unwrap_or(DEFAULT_FORKS),
             inventory_manager,
             variable_manager,
+            terminated: false,
+            unreachable_hosts: HashMap::new(),
         }
+    }
+
+    pub fn get_inventory_manager(&self) -> &InventoryManager {
+        self.inventory_manager
     }
 
     pub async fn run(&mut self, play: &Play) -> Result<()> {
@@ -46,15 +55,15 @@ impl<'a> TaskQueueManager<'a> {
 
         self.emit_event(EventType::PlaybookOnPlayStart, None).await;
 
-        let mut play_iterator = PlayIterator::new();
-        play_iterator.init(play, self.inventory_manager)?;
+        let mut play_iterator = PlayIterator::new(play);
+        play_iterator.init(self.inventory_manager)?;
 
         let forks = min(self.forks, play_iterator.get_batch_size());
 
         match play.get_strategy() {
             Strategy::Linear => {
-                let strategy = LinearStrategy::new(&self);
-                strategy.run(&play_iterator);
+                let mut strategy = LinearStrategy::new(&self);
+                strategy.run(&mut play_iterator)?;
             }
             Strategy::Free => {
                 todo!()
@@ -72,6 +81,14 @@ impl<'a> TaskQueueManager<'a> {
                 .or_insert_with(Vec::new)
                 .push(callback.clone());
         }
+    }
+
+    pub fn get_unreachable_hosts(&self) -> &HashMap<String, Host> {
+        &self.unreachable_hosts
+    }
+
+    pub fn is_terminated(&self) -> bool {
+        self.terminated
     }
 
     fn load_callbacks(&mut self, plugin_dir: &str) {
