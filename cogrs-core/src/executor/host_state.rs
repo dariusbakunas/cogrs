@@ -12,7 +12,7 @@ pub enum IteratingState {
     Complete,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HostState {
     name: String,
     blocks: Vec<Block>,
@@ -100,6 +100,10 @@ impl HostState {
         self.curr_block
     }
 
+    pub fn current_always_task_index(&self) -> usize {
+        self.curr_always_task
+    }
+
     pub fn set_current_block_index(&mut self, index: usize) {
         self.curr_block = index;
     }
@@ -158,5 +162,9 @@ impl HostState {
 
     pub fn did_start_at_task(&self) -> bool {
         self.did_start_at_task
+    }
+
+    pub fn set_did_rescue(&mut self, did_rescue: bool) {
+        self.did_rescue = did_rescue;
     }
 }

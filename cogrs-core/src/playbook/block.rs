@@ -33,6 +33,14 @@ impl Block {
         &self.block
     }
 
+    pub fn always_entries(&self) -> &Vec<BlockEntry> {
+        &self.always
+    }
+
+    pub fn rescue_entries(&self) -> &Vec<BlockEntry> {
+        &self.rescue
+    }
+
     pub fn set_block_entries(&mut self, entries: Vec<BlockEntry>) {
         self.block = entries;
     }
@@ -57,6 +65,10 @@ impl Block {
         self.block.get(index)
     }
 
+    pub fn get_always_entry(&self, index: usize) -> Option<&BlockEntry> {
+        self.always.get(index)
+    }
+
     pub fn add_to_block(&mut self, entry: BlockEntry) {
         self.block.push(entry);
     }
@@ -71,5 +83,28 @@ impl Block {
 
     pub fn set_is_implicit(&mut self, value: bool) {
         self.implicit = value;
+    }
+
+    fn evaluate_block(&self, block: &Block) -> Vec<Task> {
+        let mut tasks: Vec<Task> = Vec::new();
+        tasks.extend(self.evaluate_and_append_task(block.block_entries()));
+        tasks.extend(self.evaluate_and_append_task(block.rescue_entries()));
+        tasks.extend(self.evaluate_and_append_task(block.always_entries()));
+        tasks
+    }
+    fn evaluate_and_append_task(&self, entries: &[BlockEntry]) -> Vec<Task> {
+        let mut tasks: Vec<Task> = Vec::new();
+
+        for entry in entries {
+            match entry {
+                BlockEntry::Task(task) => tasks.push(task.clone()),
+                BlockEntry::Block(block) => tasks.append(&mut self.evaluate_block(block)),
+            }
+        }
+
+        tasks
+    }
+    pub fn get_tasks(&self) -> Vec<Task> {
+        self.evaluate_block(self)
     }
 }

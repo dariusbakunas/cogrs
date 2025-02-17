@@ -12,18 +12,20 @@ use log::{debug, info};
 use std::collections::HashMap;
 
 pub struct PlayIterator<'a> {
+    all_tasks: Vec<Task>,
     blocks: Vec<Block>,
     handlers: Vec<Handler>,
     batch_size: u32,
     host_states: HashMap<String, HostState>,
     end_play: bool,
-    cur_task: u32,
+    cur_task: usize,
     play: &'a Play,
 }
 
 impl<'a> PlayIterator<'a> {
     pub fn new(play: &'a Play) -> Self {
         PlayIterator {
+            all_tasks: Vec::new(),
             blocks: Vec::new(),
             handlers: Vec::new(),
             batch_size: 0,
@@ -50,12 +52,15 @@ impl<'a> PlayIterator<'a> {
         let setup_task = setup_task_builder.build();
 
         setup_block.add_to_block(BlockEntry::Task(setup_task));
-        self.blocks.push(setup_block);
+        self.blocks.push(setup_block.clone());
+
+        self.all_tasks = setup_block.get_tasks();
 
         for block in self.play.compile() {
             // TODO: filter tagged tasks
             if block.has_any_entries() {
-                self.blocks.push(block);
+                self.blocks.push(block.clone());
+                self.all_tasks.extend(block.get_tasks());
             }
         }
 
@@ -127,6 +132,10 @@ impl<'a> PlayIterator<'a> {
         }
     }
 
+    pub fn set_state_for_host(&mut self, host: &str, state: HostState) {
+        self.host_states.insert(host.to_string(), state);
+    }
+
     fn check_failed_state(&self, host_state: Option<&HostState>) -> bool {
         if let Some(host_state) = host_state {
             let run_state = host_state.run_state();
@@ -157,7 +166,7 @@ impl<'a> PlayIterator<'a> {
                 _ => {}
             }
 
-            if failed_state != FailedStates::new() {
+            if failed_state != FailedState::None {
                 return match run_state {
                     IteratingState::Rescue => !(failed_state & FailedState::Rescue == 0),
                     IteratingState::Always => !(failed_state & FailedState::Always == 0),
@@ -237,6 +246,8 @@ impl<'a> PlayIterator<'a> {
                         host_state.tasks_child_state().map(|s| s.clone())
                     {
                         task = self.get_next_task_from_state(&mut task_child_state)?;
+                        host_state.set_tasks_child_state(Some(&task_child_state));
+
                         if self.check_failed_state(Some(&task_child_state)) {
                             // failed child state, so clear it and move into the rescue portion
                             host_state.set_tasks_child_state(None);
@@ -283,7 +294,61 @@ impl<'a> PlayIterator<'a> {
                     }
                 }
                 IteratingState::Rescue => {}
-                IteratingState::Always => {}
+                IteratingState::Always => {
+                    // And again, the process here is identical to IteratingStates.TASKS, except
+                    // instead we either move onto the next block in the list, or we set the
+                    // run state to IteratingStates.COMPLETE in the event of any errors, or when we
+                    // have hit the end of the list of blocks.
+                    if let Some(mut always_child_state) =
+                        host_state.always_child_state().map(|s| s.clone())
+                    {
+                        task = self.get_next_task_from_state(&mut always_child_state)?;
+                        host_state.set_always_child_state(Some(&always_child_state));
+
+                        if self.check_failed_state(Some(&always_child_state)) {
+                            host_state.set_always_child_state(None);
+                            self.set_failed_state(host_state);
+                        } else {
+                            if task.is_none()
+                                || always_child_state.run_state() == IteratingState::Complete
+                            {
+                                host_state.set_always_child_state(None);
+                                continue;
+                            }
+                        }
+                    } else {
+                        if host_state.current_always_task_index() >= block.always_entries().len() {
+                            if host_state.fail_state() != FailedState::None {
+                                host_state.set_run_state(IteratingState::Complete);
+                            } else {
+                                host_state
+                                    .set_current_block_index(host_state.current_block_index() + 1);
+                                host_state.set_current_regular_task_index(0);
+                                host_state.set_current_rescue_task_index(0);
+                                host_state.set_current_always_task_index(0);
+                                host_state.set_run_state(IteratingState::Tasks);
+                                host_state.set_tasks_child_state(None);
+                                host_state.set_rescue_child_state(None);
+                                host_state.set_always_child_state(None);
+                                host_state.set_did_rescue(false);
+                            }
+                        } else {
+                            task = block
+                                .get_always_entry(host_state.current_always_task_index())
+                                .map(|e| e.clone());
+
+                            if let Some(BlockEntry::Block(block)) = task {
+                                let mut child_state = HostState::new(host_state.name(), &[*block]);
+                                child_state.set_run_state(IteratingState::Tasks);
+                                host_state.set_always_child_state(Some(&child_state));
+                                task = None;
+                            }
+                            host_state.set_current_always_task_index(
+                                host_state.current_always_task_index() + 1,
+                            );
+                        }
+                    }
+                }
                 IteratingState::Handlers => {}
                 IteratingState::Complete => {}
             }
@@ -314,11 +379,23 @@ impl<'a> PlayIterator<'a> {
         Ok(task)
     }
 
+    pub fn get_current_task(&self) -> Option<&Task> {
+        self.all_tasks.get(self.cur_task)
+    }
+
+    pub fn get_current_task_index(&self) -> usize {
+        self.cur_task
+    }
+
+    pub fn set_current_task_index(&mut self, index: usize) {
+        self.cur_task = index;
+    }
+
     pub fn get_next_task_for_host(
         &mut self,
         host: &Host,
         peek: bool,
-    ) -> Result<(HostState, Option<Task>)> {
+    ) -> Result<(HostState, Option<BlockEntry>)> {
         debug!("Getting next task for host: {}", host.name());
         let mut host_state = self
             .host_states
@@ -337,11 +414,17 @@ impl<'a> PlayIterator<'a> {
         let task = self.get_next_task_from_state(&mut host_state)?;
 
         if !peek {
-            self.host_states.insert(host.name().to_string(), host_state);
+            self.host_states
+                .insert(host.name().to_string(), host_state.clone());
         }
 
-        //debug!("Done getting next task for host {}, task: {}", host.get_name(), task);
-        todo!()
+        debug!(
+            "Done getting next task for host {}, task: {:?}, state: {:?}",
+            host.name(),
+            task,
+            host_state
+        );
+        Ok((host_state, task))
     }
 
     pub fn batch_size(&self) -> u32 {
