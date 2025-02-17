@@ -5,7 +5,8 @@ use std::fmt::Formatter;
 
 #[derive(Clone)]
 pub enum Action {
-    Module(String, String),
+    Module(String, Option<String>),
+    Meta(String),
 }
 
 #[derive(Clone)]
@@ -51,6 +52,9 @@ impl fmt::Display for Task {
         match &self.action {
             Action::Module(name, _) => {
                 write!(f, "TASK: {}", name)
+            }
+            Action::Meta(_) => {
+                write!(f, "META TASK")
             }
         }
     }

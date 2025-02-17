@@ -135,12 +135,9 @@ impl Play {
         // of the playbook execution
         let mut flush_block = Block::new();
 
-        let meta_task = TaskBuilder::new(Action::Module(
-            "meta".to_string(),
-            "flush_handlers".to_string(),
-        ))
-        .implicit(true)
-        .build();
+        let meta_task = TaskBuilder::new(Action::Meta("flush_handlers".to_string()))
+            .implicit(true)
+            .build();
 
         if self.tags.is_empty() {
             flush_block.add_to_block(BlockEntry::Task(meta_task));
@@ -149,10 +146,9 @@ impl Play {
         };
 
         if self.force_handlers {
-            let noop_task =
-                TaskBuilder::new(Action::Module("meta".to_string(), "noop".to_string()))
-                    .implicit(true)
-                    .build();
+            let noop_task = TaskBuilder::new(Action::Meta("noop".to_string()))
+                .implicit(true)
+                .build();
 
             // TODO: add remaining blocks
         }

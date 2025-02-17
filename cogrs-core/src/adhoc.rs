@@ -7,6 +7,7 @@ use crate::playbook::Playbook;
 use crate::vars::manager::VariableManager;
 use anyhow::Result;
 use log::info;
+use std::ops::Deref;
 
 pub struct AdHoc;
 
@@ -23,22 +24,19 @@ impl AdHoc {
         pattern: &str,
         limit: Option<&str>,
         module_name: &str,
-        module_args: &str,
+        module_args: Option<String>,
         inventory_manager: &InventoryManager,
         options: &AdHocOptions,
     ) -> Result<()> {
         info!(
-            "Running adhoc module {} with args {}",
+            "Running adhoc module {} with args {:?}",
             module_name, module_args
         );
 
-        let task = TaskBuilder::new(Action::Module(
-            module_name.to_string(),
-            module_args.to_string(),
-        ))
-        .poll_interval(options.poll_interval)
-        .async_val(options.async_val)
-        .build();
+        let task = TaskBuilder::new(Action::Module(module_name.to_string(), module_args))
+            .poll_interval(options.poll_interval)
+            .async_val(options.async_val)
+            .build();
 
         let tasks = vec![task];
         let roles = [];

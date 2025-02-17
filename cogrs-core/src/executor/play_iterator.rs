@@ -38,8 +38,7 @@ impl<'a> PlayIterator<'a> {
         let batch = inventory_manager.filter_hosts(self.play.get_pattern(), None)?;
         self.batch_size = batch.len() as u32;
 
-        let mut setup_task_builder =
-            TaskBuilder::new(Action::Module("setup".to_string(), "".to_string()));
+        let mut setup_task_builder = TaskBuilder::new(Action::Meta("setup".to_string()));
 
         // Unless play is specifically tagged, gathering should 'always' run
         if self.play.get_tags().is_empty() {
@@ -272,7 +271,9 @@ impl<'a> PlayIterator<'a> {
             }
 
             // if something above set the task, break out of the loop now
-            if task.is_some() {}
+            if let Some(ref entry) = task {
+                // skip implicit flush_handlers if there are no handlers notified
+            }
         }
 
         Ok(task)

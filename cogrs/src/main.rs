@@ -31,10 +31,6 @@ async fn run() -> Result<()> {
             println!("{}", host.get_name());
         }
     } else if let Some(module_name) = cli.module_name {
-        let args = cli
-            .args
-            .with_context(|| anyhow!("No argument passed to {module_name} module"))?;
-
         let options = AdHocOptions {
             forks: cli.forks,
             poll_interval: Some(cli.poll_interval),
@@ -47,7 +43,7 @@ async fn run() -> Result<()> {
             pattern,
             cli.limit.as_deref(),
             &module_name,
-            &args,
+            cli.args,
             &manager,
             &options,
         )
