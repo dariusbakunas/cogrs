@@ -1,4 +1,5 @@
 use crate::playbook::block::{Block, BlockEntry};
+use crate::playbook::handler::Handler;
 use crate::playbook::role::Role;
 use crate::playbook::task::{Action, Task, TaskBuilder};
 use crate::strategy::Strategy;
@@ -9,6 +10,7 @@ const GATHER_TIMEOUT_DEFAULT: u32 = 10;
 pub struct Play {
     pub name: String,
     tasks: Vec<Block>,
+    handlers: Vec<Handler>,
     pre_tasks: Vec<Block>,
     post_tasks: Vec<Block>,
     roles: Vec<Role>,
@@ -36,6 +38,7 @@ impl Play {
     fn new(
         name: String,
         tasks: Vec<Block>,
+        handlers: Vec<Handler>,
         pre_tasks: Vec<Block>,
         post_tasks: Vec<Block>,
         roles: Vec<Role>,
@@ -60,6 +63,7 @@ impl Play {
         Play {
             name,
             tasks,
+            handlers,
             pre_tasks,
             post_tasks,
             roles,
@@ -127,6 +131,10 @@ impl Play {
         blocks
     }
 
+    pub fn handlers(&self) -> &Vec<Handler> {
+        &self.handlers
+    }
+
     pub fn compile(&self) -> Vec<Block> {
         let mut blocks: Vec<Block> = Vec::new();
 
@@ -169,6 +177,7 @@ impl Play {
 pub struct PlayBuilder {
     name: String,
     tasks: Vec<Block>,
+    handlers: Vec<Handler>,
     pre_tasks: Vec<Block>,
     post_tasks: Vec<Block>,
     roles: Vec<Role>,
@@ -196,6 +205,7 @@ impl PlayBuilder {
         PlayBuilder {
             name: String::from(name),
             tasks: Vec::new(),
+            handlers: Vec::new(),
             pre_tasks: Vec::new(),
             post_tasks: Vec::new(),
             roles: roles.to_vec(),
@@ -224,8 +234,8 @@ impl PlayBuilder {
         self
     }
 
-    pub fn become_user(mut self, user: String) -> Self {
-        self.become_user = Some(user);
+    pub fn become_user(mut self, user: &str) -> Self {
+        self.become_user = Some(user.to_string());
         self
     }
 
@@ -234,8 +244,8 @@ impl PlayBuilder {
         self
     }
 
-    pub fn connection(mut self, connection: String) -> Self {
-        self.connection = connection;
+    pub fn connection(mut self, connection: &str) -> Self {
+        self.connection = connection.to_string();
         self
     }
 
@@ -315,6 +325,7 @@ impl PlayBuilder {
         Play::new(
             self.name,
             self.tasks,
+            self.handlers,
             self.pre_tasks,
             self.post_tasks,
             self.roles,

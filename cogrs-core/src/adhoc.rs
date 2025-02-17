@@ -54,7 +54,7 @@ impl AdHoc {
             .tasks(&tasks)
             .build();
 
-        let _playbook = Playbook::new(String::from("__adhoc_playbook__"), &[play.clone()]);
+        let _playbook = Playbook::new("__adhoc_playbook__", &[play.clone()]);
 
         let mut tqm =
             TaskQueueManager::new(Some(options.forks), inventory_manager, &variable_manager);

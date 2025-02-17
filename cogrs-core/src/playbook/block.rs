@@ -29,7 +29,7 @@ impl Block {
         }
     }
 
-    pub fn get_block_entries(&self) -> &Vec<BlockEntry> {
+    pub fn block_entries(&self) -> &Vec<BlockEntry> {
         &self.block
     }
 

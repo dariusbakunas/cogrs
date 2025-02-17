@@ -1,6 +1,7 @@
 use play::Play;
 
 pub mod block;
+pub mod handler;
 pub mod play;
 pub mod role;
 pub mod task;
@@ -11,9 +12,9 @@ pub struct Playbook {
 }
 
 impl Playbook {
-    pub fn new(file_name: String, plays: &[Play]) -> Self {
+    pub fn new(file_name: &str, plays: &[Play]) -> Self {
         Playbook {
-            file_name,
+            file_name: file_name.to_string(),
             plays: plays.to_vec(),
         }
     }

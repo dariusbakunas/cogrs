@@ -52,6 +52,22 @@ impl Task {
     pub fn action(&self) -> &Action {
         &self.action
     }
+
+    pub fn role(&self) -> Option<&Role> {
+        self.role.as_ref()
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn poll_interval(&self) -> Option<u64> {
+        self.poll_interval
+    }
+
+    pub fn async_val(&self) -> Option<u64> {
+        self.async_val
+    }
 }
 
 impl fmt::Display for Task {

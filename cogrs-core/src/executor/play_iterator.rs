@@ -4,16 +4,16 @@ use crate::executor::host_state::{HostState, IteratingState};
 use crate::inventory::host::Host;
 use crate::inventory::manager::InventoryManager;
 use crate::playbook::block::{Block, BlockEntry};
+use crate::playbook::handler::Handler;
 use crate::playbook::play::Play;
 use crate::playbook::task::{Action, Task, TaskBuilder};
 use anyhow::Result;
 use log::{debug, info};
-use std::cmp::PartialEq;
 use std::collections::HashMap;
-use std::ops::BitAnd;
 
 pub struct PlayIterator<'a> {
     blocks: Vec<Block>,
+    handlers: Vec<Handler>,
     batch_size: u32,
     host_states: HashMap<String, HostState>,
     end_play: bool,
@@ -24,7 +24,8 @@ pub struct PlayIterator<'a> {
 impl<'a> PlayIterator<'a> {
     pub fn new(play: &'a Play) -> Self {
         PlayIterator {
-            blocks: vec![],
+            blocks: Vec::new(),
+            handlers: Vec::new(),
             batch_size: 0,
             host_states: HashMap::new(),
             end_play: false,
@@ -57,6 +58,13 @@ impl<'a> PlayIterator<'a> {
                 self.blocks.push(block);
             }
         }
+
+        // keep list of all handlers, it is copied into each HostState
+        // at the beginning of IteratingStates.HANDLERS
+        // the copy happens at each flush in order to restore the original
+        // list and remove any included handlers that might not be notified
+        // at the particular flush
+        // TODO: set handlers here
 
         for host in batch {
             let host_state = HostState::new(host.name(), &self.blocks);
@@ -253,7 +261,7 @@ impl<'a> PlayIterator<'a> {
                         if self.check_failed_state(Some(host_state)) {
                             host_state.set_run_state(IteratingState::Rescue);
                         } else if host_state.current_regular_task_index()
-                            >= block.get_block_entries().len()
+                            >= block.block_entries().len()
                         {
                             host_state.set_run_state(IteratingState::Always);
                         } else {
@@ -285,12 +293,20 @@ impl<'a> PlayIterator<'a> {
                 // skip implicit flush_handlers if there are no handlers notified
                 if let BlockEntry::Task(ref task) = entry {
                     if let Action::Meta(action) = task.action() {
-                        if action == "flush_handlers" && !host_state.has_handler_notifications() {
-                            // TODO: there are more conditions here
-                            debug!("No handler notifications for {}", host_state.name());
+                        if action == "flush_handlers"
+                            && !host_state.has_handler_notifications()
+                            && self.handlers.iter().all(|h| !h.has_notified_hosts())
+                        {
+                            debug!("No handler notifications for '{}'", host_state.name());
                         }
+                    } else if let Some(role) = task.role() {
+                        if !role.allow_duplicates() {
+                            // TODO: add host.name in self._play._get_cached_role(role)._completed condition
+                            debug!("'{}' skipped because role has already run", task.name())
+                        }
+                    } else {
+                        break;
                     }
-                    // TODO: more conditions here
                 }
             }
         }
