@@ -16,6 +16,18 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Install Tarpaulin
+      run: cargo install cargo-tarpaulin
+
+    - name: Run coverage and generate LCOV
+      run: cargo tarpaulin --out Lcov
+
+    - name: Upload to Coveralls
+      uses: coverallsapp/github-action@v2.3.6
+      with:
+        path-to-lcov: ./tarpaulin.lcov
+
     - name: Build
       run: cargo build --verbose
     - name: Run tests
