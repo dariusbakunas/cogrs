@@ -3,15 +3,16 @@ use crate::utils::get_unique_id;
 use std::fmt;
 use std::fmt::Formatter;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Action {
     Module(String, Option<String>),
     Meta(String),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Task {
     uuid: String,
+    name: String,
     role: Option<Role>,
     action: Action,
     poll_interval: Option<u64>,
@@ -24,6 +25,7 @@ pub struct Task {
 
 impl Task {
     fn new(
+        name: String,
         action: &Action,
         role: Option<Role>,
         poll_interval: Option<u64>,
@@ -32,6 +34,7 @@ impl Task {
         tags: Vec<String>,
     ) -> Self {
         Self {
+            name,
             uuid: get_unique_id(false),
             action: action.clone(),
             role,
@@ -61,6 +64,7 @@ impl fmt::Display for Task {
 }
 
 pub struct TaskBuilder {
+    name: String,
     action: Action,
     role: Option<Role>,
     poll_interval: Option<u64>,
@@ -70,8 +74,9 @@ pub struct TaskBuilder {
 }
 
 impl TaskBuilder {
-    pub fn new(action: Action) -> TaskBuilder {
+    pub fn new(name: &str, action: Action) -> TaskBuilder {
         TaskBuilder {
+            name: name.to_string(),
             action,
             role: None,
             poll_interval: None,
@@ -108,6 +113,7 @@ impl TaskBuilder {
 
     pub fn build(self) -> Task {
         Task::new(
+            self.name,
             &self.action,
             self.role,
             self.poll_interval,

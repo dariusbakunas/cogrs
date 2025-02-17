@@ -33,10 +33,13 @@ impl AdHoc {
             module_name, module_args
         );
 
-        let task = TaskBuilder::new(Action::Module(module_name.to_string(), module_args))
-            .poll_interval(options.poll_interval)
-            .async_val(options.async_val)
-            .build();
+        let task = TaskBuilder::new(
+            "AdHoc",
+            Action::Module(module_name.to_string(), module_args),
+        )
+        .poll_interval(options.poll_interval)
+        .async_val(options.async_val)
+        .build();
 
         let tasks = vec![task];
         let roles = [];

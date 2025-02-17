@@ -1,13 +1,13 @@
 use crate::playbook::task::Task;
 use crate::utils::get_unique_id;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum BlockEntry {
     Task(Task),
     Block(Box<Block>),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Block {
     block: Vec<BlockEntry>,
     rescue: Vec<BlockEntry>,
