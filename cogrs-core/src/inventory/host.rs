@@ -19,11 +19,11 @@ impl Host {
         }
     }
 
-    pub fn get_vars(&self) -> &IndexMap<String, Variable> {
+    pub fn vars(&self) -> &IndexMap<String, Variable> {
         &self.vars
     }
 
-    pub fn get_name(&self) -> &str {
+    pub fn name(&self) -> &str {
         &self.name
     }
 
@@ -46,7 +46,7 @@ impl Host {
         }
     }
 
-    pub fn get_groups(&self) -> &Vec<String> {
+    pub fn groups(&self) -> &Vec<String> {
         &self.groups
     }
 

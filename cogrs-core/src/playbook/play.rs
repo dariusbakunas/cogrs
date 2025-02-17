@@ -8,9 +8,9 @@ const GATHER_TIMEOUT_DEFAULT: u32 = 10;
 #[derive(Clone)]
 pub struct Play {
     pub name: String,
-    tasks: Vec<BlockEntry>,
-    pre_tasks: Vec<BlockEntry>,
-    post_tasks: Vec<BlockEntry>,
+    tasks: Vec<Block>,
+    pre_tasks: Vec<Block>,
+    post_tasks: Vec<Block>,
     roles: Vec<Role>,
     use_become: bool,
     force_handlers: bool,
@@ -35,9 +35,9 @@ impl Play {
     #[allow(clippy::too_many_arguments)]
     fn new(
         name: String,
-        tasks: Vec<BlockEntry>,
-        pre_tasks: Vec<BlockEntry>,
-        post_tasks: Vec<BlockEntry>,
+        tasks: Vec<Block>,
+        pre_tasks: Vec<Block>,
+        post_tasks: Vec<Block>,
         roles: Vec<Role>,
         use_become: bool,
         become_user: Option<String>,
@@ -87,19 +87,19 @@ impl Play {
         PlayBuilder::new(name, roles)
     }
 
-    pub fn get_pattern(&self) -> &str {
+    pub fn pattern(&self) -> &str {
         self.pattern.as_str()
     }
 
-    pub fn get_limit(&self) -> Option<&str> {
+    pub fn limit(&self) -> Option<&str> {
         self.limit.as_ref().map(|l| l.as_str())
     }
 
-    pub fn get_tags(&self) -> &Vec<String> {
+    pub fn tags(&self) -> &Vec<String> {
         &self.tags
     }
 
-    pub fn get_strategy(&self) -> &Strategy {
+    pub fn strategy(&self) -> &Strategy {
         &self.strategy
     }
 
@@ -119,16 +119,16 @@ impl Play {
         self.finalized
     }
 
-    fn compile_roles(&self) -> Vec<BlockEntry> {
-        let mut blocks: Vec<BlockEntry> = Vec::new();
+    fn compile_roles(&self) -> Vec<Block> {
+        let mut blocks: Vec<Block> = Vec::new();
 
         // TODO: compile_rows
 
         blocks
     }
 
-    pub fn compile(&self) -> Vec<BlockEntry> {
-        let mut blocks: Vec<BlockEntry> = Vec::new();
+    pub fn compile(&self) -> Vec<Block> {
+        let mut blocks: Vec<Block> = Vec::new();
 
         // create a block containing a single flush handlers meta
         // task, so we can be sure to run handlers at certain points
@@ -155,12 +155,12 @@ impl Play {
         }
 
         blocks.extend(self.pre_tasks.clone());
-        blocks.push(BlockEntry::Block(Box::new(flush_block.clone())));
+        blocks.push(flush_block.clone());
         blocks.extend(self.compile_roles());
         blocks.extend(self.tasks.clone());
-        blocks.push(BlockEntry::Block(Box::new(flush_block.clone())));
+        blocks.push(flush_block.clone());
         blocks.extend(self.post_tasks.clone());
-        blocks.push(BlockEntry::Block(Box::new(flush_block)));
+        blocks.push(flush_block);
 
         blocks
     }
@@ -168,9 +168,9 @@ impl Play {
 
 pub struct PlayBuilder {
     name: String,
-    tasks: Vec<BlockEntry>,
-    pre_tasks: Vec<BlockEntry>,
-    post_tasks: Vec<BlockEntry>,
+    tasks: Vec<Block>,
+    pre_tasks: Vec<Block>,
+    post_tasks: Vec<Block>,
     roles: Vec<Role>,
     use_become: bool,
     become_user: Option<String>,
@@ -270,12 +270,12 @@ impl PlayBuilder {
     }
 
     pub fn tasks(mut self, tasks: &[Task]) -> Self {
-        let mut blocks: Vec<BlockEntry> = Vec::new();
+        let mut blocks: Vec<Block> = Vec::new();
         for task in tasks {
             let mut block = Block::new();
             block.set_is_implicit(true);
             block.add_to_block(BlockEntry::Task(task.clone()));
-            blocks.push(BlockEntry::Block(Box::new(block)));
+            blocks.push(block);
         }
         self.tasks = blocks;
         self

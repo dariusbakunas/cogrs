@@ -58,9 +58,9 @@ impl<'a> TaskQueueManager<'a> {
         let mut play_iterator = PlayIterator::new(play);
         play_iterator.init(self.inventory_manager)?;
 
-        let forks = min(self.forks, play_iterator.get_batch_size());
+        let forks = min(self.forks, play_iterator.batch_size());
 
-        match play.get_strategy() {
+        match play.strategy() {
             Strategy::Linear => {
                 let mut strategy = LinearStrategy::new(&self);
                 strategy.run(&mut play_iterator)?;

@@ -115,20 +115,20 @@ impl InventoryManager {
             .ok_or_else(|| anyhow::format_err!("Could not find 'ungrouped' group"))?;
 
         for host in self.hosts.values_mut() {
-            let host_groups: HashSet<&String> = host.get_groups().into_iter().collect();
+            let host_groups: HashSet<&String> = host.groups().into_iter().collect();
 
             if host_groups.contains(&String::from("ungrouped")) && host_groups.len() > 2 {
-                ungrouped_group.remove_host(&host.get_name());
+                ungrouped_group.remove_host(&host.name());
             } else if !host.is_implicit() {
                 if host_groups.is_empty()
                     || (host_groups.len() == 1 && host_groups.contains(&String::from("all")))
                 {
-                    ungrouped_group.add_host(&host.get_name());
+                    ungrouped_group.add_host(&host.name());
                 }
             }
 
             if host.is_implicit() {
-                let vars = combine_variables(&all_group.get_vars(), &host.get_vars());
+                let vars = combine_variables(&all_group.get_vars(), &host.vars());
                 host.set_vars(vars);
             }
         }

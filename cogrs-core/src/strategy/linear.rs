@@ -32,14 +32,14 @@ impl<'a> LinearStrategy<'a> {
         }
 
         // TODO: check ansible logic here
-        let pattern = play.get_pattern();
-        let limit = play.get_limit();
+        let pattern = play.pattern();
+        let limit = play.limit();
 
         self.host_cache = self
             .inventory_manager
             .filter_hosts(pattern, limit)?
             .iter()
-            .map(|h| h.get_name().to_string())
+            .map(|h| h.name().to_string())
             .collect();
 
         Ok(())
@@ -69,7 +69,7 @@ impl<'a> LinearStrategy<'a> {
             let (state, task) = iterator.get_next_task_for_host(host, true)?;
 
             if let Some(task) = task {
-                state_task_per_host.insert(host.get_name().to_string(), (state, task));
+                state_task_per_host.insert(host.name().to_string(), (state, task));
             }
         }
 
@@ -79,7 +79,7 @@ impl<'a> LinearStrategy<'a> {
 
         let task_uuids: HashSet<&str> = state_task_per_host
             .values()
-            .map(|(_, task)| task.get_uuid())
+            .map(|(_, task)| task.uuid())
             .collect();
 
         // TODO: finish this method
@@ -88,7 +88,7 @@ impl<'a> LinearStrategy<'a> {
     }
 
     pub fn run(&mut self, iterator: &mut PlayIterator) -> Result<()> {
-        self.set_host_cache(iterator.get_play(), false)?;
+        self.set_host_cache(iterator.play(), false)?;
 
         while !self.tqm.is_terminated() {
             let hosts_left = self.get_hosts_left();

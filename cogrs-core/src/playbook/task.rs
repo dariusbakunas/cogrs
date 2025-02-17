@@ -45,8 +45,12 @@ impl Task {
         }
     }
 
-    pub fn get_uuid(&self) -> &str {
+    pub fn uuid(&self) -> &str {
         &self.uuid
+    }
+
+    pub fn action(&self) -> &Action {
+        &self.action
     }
 }
 

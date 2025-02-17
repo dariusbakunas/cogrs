@@ -29,6 +29,10 @@ impl Block {
         }
     }
 
+    pub fn get_block_entries(&self) -> &Vec<BlockEntry> {
+        &self.block
+    }
+
     pub fn set_block_entries(&mut self, entries: Vec<BlockEntry>) {
         self.block = entries;
     }
