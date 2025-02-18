@@ -16,7 +16,7 @@ pub struct TaskQueueManager<'a> {
     forks: u32,
     callbacks_loaded: bool,
     inventory_manager: &'a InventoryManager,
-    variable_manager: &'a VariableManager,
+    variable_manager: &'a VariableManager<'a>,
     callbacks: HashMap<EventType, Vec<Arc<dyn CallbackPlugin>>>,
     terminated: bool,
     unreachable_hosts: HashMap<String, Host>,
@@ -41,17 +41,22 @@ impl<'a> TaskQueueManager<'a> {
         }
     }
 
-    pub fn get_inventory_manager(&self) -> &InventoryManager {
+    pub fn inventory_manager(&self) -> &InventoryManager {
         self.inventory_manager
+    }
+
+    pub fn variable_manager(&self) -> &VariableManager {
+        self.variable_manager
     }
 
     pub async fn run(&mut self, play: &Play) -> Result<()> {
         self.load_callbacks(
+            // TODO: add logic to get callback plugin path
             "/Users/darius/Programming/cogrs/dist/minimal-apple_x86_64-apple-darwin",
         );
         let all_vars = self
             .variable_manager
-            .get_vars(play, None, self.inventory_manager);
+            .get_vars(Some(play), None, None, true, true);
 
         self.emit_event(EventType::PlaybookOnPlayStart, None).await;
 

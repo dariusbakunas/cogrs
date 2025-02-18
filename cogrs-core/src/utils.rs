@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn test_generate_id_thread_safety() {
-        let mut handles = vec![];
+        let mut handles = Vec::new();
         let generated_ids = Arc::new(Mutex::new(HashSet::new()));
 
         // Spawn multiple threads to generate unique IDs

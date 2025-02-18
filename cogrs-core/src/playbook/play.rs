@@ -3,12 +3,14 @@ use crate::playbook::handler::Handler;
 use crate::playbook::role::Role;
 use crate::playbook::task::{Action, Task, TaskBuilder};
 use crate::strategy::Strategy;
+use crate::vars::variable::Variable;
+use std::collections::HashMap;
 
 const GATHER_TIMEOUT_DEFAULT: u32 = 10;
 
 #[derive(Clone)]
 pub struct Play {
-    pub name: String,
+    name: String,
     tasks: Vec<Block>,
     handlers: Vec<Handler>,
     pre_tasks: Vec<Block>,
@@ -31,6 +33,8 @@ pub struct Play {
     pattern: String,
     limit: Option<String>,
     tags: Vec<String>,
+    vars: HashMap<String, Variable>,
+    vars_files: Vec<String>,
 }
 
 impl Play {
@@ -59,6 +63,8 @@ impl Play {
         pattern: String,
         limit: Option<String>,
         tags: Vec<String>,
+        vars: HashMap<String, Variable>,
+        vars_files: Vec<String>,
     ) -> Self {
         Play {
             name,
@@ -84,7 +90,25 @@ impl Play {
             pattern,
             limit,
             tags,
+            vars,
+            vars_files,
         }
+    }
+
+    pub fn name(&self) -> &str {
+        self.name.as_str()
+    }
+
+    pub fn tasks(&self) -> &Vec<Block> {
+        &self.tasks
+    }
+
+    pub fn vars(&self) -> &HashMap<String, Variable> {
+        &self.vars
+    }
+
+    pub fn vars_files(&self) -> &Vec<String> {
+        &self.vars_files
     }
 
     pub fn builder(name: &str, roles: &[Role]) -> PlayBuilder {
@@ -121,6 +145,10 @@ impl Play {
 
     pub fn is_finalized(&self) -> bool {
         self.finalized
+    }
+
+    pub fn roles(&self) -> &Vec<Role> {
+        &self.roles
     }
 
     fn compile_roles(&self) -> Vec<Block> {
@@ -198,6 +226,8 @@ pub struct PlayBuilder {
     pattern: String,
     limit: Option<String>,
     tags: Vec<String>,
+    vars: HashMap<String, Variable>,
+    vars_files: Vec<String>,
 }
 
 impl PlayBuilder {
@@ -217,7 +247,7 @@ impl PlayBuilder {
             diff: false,
             finalized: false,
             gather_facts: None,
-            gather_subset: vec![],
+            gather_subset: Vec::new(),
             gather_timeout: GATHER_TIMEOUT_DEFAULT,
             no_log: false,
             strategy: Strategy::Linear,
@@ -225,7 +255,9 @@ impl PlayBuilder {
             timeout: 0,
             pattern: String::from("all"),
             limit: None,
-            tags: vec![],
+            tags: Vec::new(),
+            vars: HashMap::new(),
+            vars_files: Vec::new(),
         }
     }
 
@@ -346,6 +378,8 @@ impl PlayBuilder {
             self.pattern,
             self.limit,
             self.tags,
+            self.vars,
+            self.vars_files,
         )
     }
 }

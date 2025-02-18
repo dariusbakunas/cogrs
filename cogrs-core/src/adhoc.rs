@@ -44,7 +44,7 @@ impl AdHoc {
         let tasks = vec![task];
         let roles = [];
 
-        let variable_manager = VariableManager::new();
+        let variable_manager = VariableManager::new(inventory_manager);
 
         let play = Play::builder("CogRS Ad-Hoc", &roles)
             .use_become(false)

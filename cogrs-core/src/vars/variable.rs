@@ -23,6 +23,7 @@ impl Number {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Mapping {
+    // TODO: do we need IndexMap here? or could we just use regular HashMap
     map: IndexMap<String, Variable>,
 }
 

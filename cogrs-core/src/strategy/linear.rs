@@ -6,6 +6,7 @@ use crate::inventory::manager::InventoryManager;
 use crate::playbook::block::BlockEntry;
 use crate::playbook::play::Play;
 use crate::playbook::task::Task;
+use crate::vars::manager::VariableManager;
 use anyhow::{anyhow, bail, Result};
 use log::{debug, warn};
 use std::collections::{HashMap, HashSet};
@@ -16,6 +17,7 @@ use std::collections::{HashMap, HashSet};
 pub struct LinearStrategy<'a> {
     tqm: &'a TaskQueueManager<'a>,
     inventory_manager: &'a InventoryManager,
+    variable_manager: &'a VariableManager<'a>,
     host_cache: Vec<String>,
 }
 
@@ -23,8 +25,9 @@ impl<'a> LinearStrategy<'a> {
     pub fn new(tqm: &'a TaskQueueManager) -> Self {
         LinearStrategy {
             tqm,
-            inventory_manager: tqm.get_inventory_manager(),
-            host_cache: vec![],
+            inventory_manager: tqm.inventory_manager(),
+            variable_manager: tqm.variable_manager(),
+            host_cache: Vec::new(),
         }
     }
 
@@ -147,6 +150,17 @@ impl<'a> LinearStrategy<'a> {
                     break;
                 }
                 debug!("getting variables");
+                let host = self
+                    .inventory_manager
+                    .get_host(&host)
+                    .ok_or(anyhow!("Host not found: {}", host))?;
+                let task_vars = self.variable_manager.get_vars(
+                    Some(iterator.play()),
+                    Some(host),
+                    Some(&task),
+                    true,
+                    true,
+                );
             }
         }
 

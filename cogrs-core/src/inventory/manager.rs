@@ -279,7 +279,7 @@ impl InventoryManager {
 
     fn apply_subscript(&self, hosts: &[String], start: i32, end: Option<i32>) -> Vec<String> {
         if hosts.is_empty() {
-            return vec![];
+            return Vec::new();
         }
 
         let len = hosts.len() as i32;
@@ -295,7 +295,7 @@ impl InventoryManager {
         // Validate indices
         if start_idx < 0 || start_idx >= len || end_idx < 0 || end_idx >= len || start_idx > end_idx
         {
-            return vec![];
+            return Vec::new();
         }
 
         // Extract and return the slice of hosts
@@ -583,7 +583,7 @@ mod tests {
         let base_dir = get_base_dir();
         let mut inventory_manager = InventoryManager::new(&base_dir);
 
-        let hosts: Vec<String> = vec![];
+        let hosts: Vec<String> = Vec::new();
 
         let result = inventory_manager.apply_subscript(&hosts, 0, Some(1));
         assert!(result.is_empty());

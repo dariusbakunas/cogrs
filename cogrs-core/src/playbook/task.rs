@@ -102,7 +102,7 @@ impl TaskBuilder {
             poll_interval: None,
             async_val: None,
             implicit: false,
-            tags: vec![],
+            tags: Vec::new(),
         }
     }
 
