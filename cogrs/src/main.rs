@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::Result;
 use clap::Parser;
 use cogrs::cli::Cli;
 use cogrs_core::adhoc::{AdHoc, AdHocOptions};

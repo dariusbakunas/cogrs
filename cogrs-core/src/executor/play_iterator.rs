@@ -1,5 +1,5 @@
 use crate::constants::DEFAULT_GATHERING;
-use crate::executor::failed_state::{FailedState, FailedStates};
+use crate::executor::failed_state::FailedState;
 use crate::executor::host_state::{HostState, IteratingState};
 use crate::inventory::host::Host;
 use crate::inventory::manager::InventoryManager;

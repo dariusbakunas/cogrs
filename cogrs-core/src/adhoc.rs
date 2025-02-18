@@ -1,13 +1,11 @@
 use crate::executor::task_queue_manager::TaskQueueManager;
 use crate::inventory::manager::InventoryManager;
-use crate::playbook::block::BlockEntry;
 use crate::playbook::play::Play;
-use crate::playbook::task::{Action, Task, TaskBuilder};
+use crate::playbook::task::{Action, TaskBuilder};
 use crate::playbook::Playbook;
 use crate::vars::manager::VariableManager;
 use anyhow::Result;
 use log::info;
-use std::ops::Deref;
 
 pub struct AdHoc;
 

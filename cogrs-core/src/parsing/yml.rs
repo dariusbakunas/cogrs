@@ -176,7 +176,7 @@ fn parse_group_hosts(
                         .or_insert_with(|| Host::new(&host_name));
                     group.add_host(&host.name());
                     host.add_group(&group.name);
-                    populate_host_vars(host, group, host_data, source);
+                    populate_host_vars(host, group, host_data, source)?;
                 }
             }
         }

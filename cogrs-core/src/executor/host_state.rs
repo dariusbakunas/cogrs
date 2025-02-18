@@ -1,5 +1,5 @@
 use crate::executor::failed_state::FailedStates;
-use crate::playbook::block::{Block, BlockEntry};
+use crate::playbook::block::Block;
 use std::cmp::PartialEq;
 
 #[derive(Debug, PartialEq, Clone)]
