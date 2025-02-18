@@ -5,9 +5,10 @@ use crate::inventory::host::Host;
 use crate::inventory::manager::InventoryManager;
 use crate::playbook::block::BlockEntry;
 use crate::playbook::play::Play;
-use crate::playbook::task::Task;
+use crate::playbook::task::{Action, Task};
 use crate::vars::manager::VariableManager;
 use anyhow::{anyhow, bail, Result};
+use cogrs_plugins::callback::EventType;
 use log::{debug, warn};
 use std::collections::{HashMap, HashSet};
 
@@ -15,18 +16,22 @@ use std::collections::{HashMap, HashSet};
 ///         it for all hosts, then wait for the queue to drain before
 ///         moving on to the next task
 pub struct LinearStrategy<'a> {
-    tqm: &'a TaskQueueManager<'a>,
+    tqm: &'a TaskQueueManager,
     inventory_manager: &'a InventoryManager,
-    variable_manager: &'a VariableManager<'a>,
+    variable_manager: &'a VariableManager,
     host_cache: Vec<String>,
 }
 
 impl<'a> LinearStrategy<'a> {
-    pub fn new(tqm: &'a TaskQueueManager) -> Self {
+    pub fn new(
+        tqm: &'a TaskQueueManager,
+        inventory_manager: &'a InventoryManager,
+        variable_manager: &'a VariableManager,
+    ) -> Self {
         LinearStrategy {
             tqm,
-            inventory_manager: tqm.inventory_manager(),
-            variable_manager: tqm.variable_manager(),
+            inventory_manager,
+            variable_manager,
             host_cache: Vec::new(),
         }
     }
@@ -128,9 +133,10 @@ impl<'a> LinearStrategy<'a> {
         Ok(host_tasks)
     }
 
-    pub fn run(&mut self, iterator: &mut PlayIterator) -> Result<()> {
+    pub async fn run(&mut self, iterator: &mut PlayIterator) -> Result<()> {
         self.set_host_cache(iterator.play(), false)?;
         let mut work_to_do = true;
+        let mut callback_sent = false;
 
         while work_to_do && !self.tqm.is_terminated() {
             debug!("getting the remaining hosts for this loop");
@@ -161,6 +167,20 @@ impl<'a> LinearStrategy<'a> {
                     true,
                     true,
                 );
+
+                if let Action::Meta(action) = task.action() {
+                    // TODO: handle meta actions
+                } else {
+                    if !callback_sent {
+                        if let Action::Handler(_) = task.action() {
+                            // TODO: send args to callback
+                            self.tqm
+                                .emit_event(EventType::PlaybookOnHandlerTaskStart, None)
+                                .await
+                        } else {
+                        }
+                    }
+                }
             }
         }
 

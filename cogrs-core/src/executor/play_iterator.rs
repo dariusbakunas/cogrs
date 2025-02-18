@@ -11,7 +11,7 @@ use anyhow::Result;
 use log::{debug, info};
 use std::collections::HashMap;
 
-pub struct PlayIterator<'a> {
+pub struct PlayIterator {
     all_tasks: Vec<Task>,
     blocks: Vec<Block>,
     handlers: Vec<Handler>,
@@ -19,11 +19,11 @@ pub struct PlayIterator<'a> {
     host_states: HashMap<String, HostState>,
     end_play: bool,
     cur_task: usize,
-    play: &'a Play,
+    play: Play,
 }
 
-impl<'a> PlayIterator<'a> {
-    pub fn new(play: &'a Play) -> Self {
+impl PlayIterator {
+    pub fn new(play: Play) -> Self {
         PlayIterator {
             all_tasks: Vec::new(),
             blocks: Vec::new(),
@@ -432,6 +432,6 @@ impl<'a> PlayIterator<'a> {
     }
 
     pub fn play(&self) -> &Play {
-        self.play
+        &self.play
     }
 }

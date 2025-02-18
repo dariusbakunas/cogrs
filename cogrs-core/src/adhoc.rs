@@ -42,7 +42,7 @@ impl AdHoc {
         let tasks = vec![task];
         let roles = [];
 
-        let variable_manager = VariableManager::new(inventory_manager);
+        let variable_manager = VariableManager::new(inventory_manager.get_base_dir());
 
         let play = Play::builder("CogRS Ad-Hoc", &roles)
             .use_become(false)
@@ -54,9 +54,8 @@ impl AdHoc {
 
         let _playbook = Playbook::new("__adhoc_playbook__", &[play.clone()]);
 
-        let mut tqm =
-            TaskQueueManager::new(Some(options.forks), inventory_manager, &variable_manager);
-        tqm.run(&play).await?;
+        let mut tqm = TaskQueueManager::new(Some(options.forks));
+        tqm.run(play, &variable_manager, inventory_manager).await?;
 
         Ok(())
     }

@@ -9,6 +9,8 @@ pub enum EventType {
     OnFileDiff,
     PlaybookOnStart,
     PlaybookOnPlayStart,
+    PlaybookOnHandlerTaskStart,
+    PlaybookOnTaskStart,
 }
 
 pub trait CallbackPlugin: Send + Sync {

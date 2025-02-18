@@ -1,21 +1,18 @@
 use crate::inventory::host::Host;
-use crate::inventory::manager::InventoryManager;
 use crate::playbook::play::Play;
 use crate::playbook::task::Task;
 use crate::vars::variable::Variable;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-pub struct VariableManager<'a> {
+pub struct VariableManager {
     playbook_dir: PathBuf,
-    inventory_manager: &'a InventoryManager,
 }
 
-impl<'a> VariableManager<'a> {
-    pub fn new(inventory_manager: &'a InventoryManager) -> Self {
+impl VariableManager {
+    pub fn new(playbook_dir: &PathBuf) -> Self {
         VariableManager {
-            playbook_dir: inventory_manager.get_base_dir().to_path_buf(),
-            inventory_manager,
+            playbook_dir: playbook_dir.to_path_buf(),
         }
     }
 
