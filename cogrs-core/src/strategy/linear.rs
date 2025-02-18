@@ -2,7 +2,7 @@ use crate::executor::host_state::HostState;
 use crate::executor::play_iterator::PlayIterator;
 use crate::executor::task_executor::TaskExecutor;
 use crate::executor::task_queue_manager::TaskQueueManager;
-use crate::executor::WorkerMessage::WorkerMessage;
+use crate::executor::worker_message::WorkerMessage;
 use crate::inventory::host::Host;
 use crate::inventory::manager::InventoryManager;
 use crate::playbook::block::BlockEntry;
