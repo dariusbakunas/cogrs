@@ -20,6 +20,8 @@ pub struct Task {
     async_val: Option<u64>,
     tags: Vec<String>,
     implicit: bool,
+    throttle: usize,
+    run_once: bool,
 }
 
 // TODO: add task builder
@@ -43,6 +45,8 @@ impl Task {
             async_val,
             implicit,
             tags,
+            throttle: 0, // TODO: where do we  get throttle
+            run_once: false,
         }
     }
 
@@ -68,6 +72,14 @@ impl Task {
 
     pub fn async_val(&self) -> Option<u64> {
         self.async_val
+    }
+
+    pub fn throttle(&self) -> usize {
+        self.throttle
+    }
+
+    pub fn run_once(&self) -> bool {
+        self.run_once
     }
 }
 

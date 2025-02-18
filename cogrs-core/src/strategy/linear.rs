@@ -1,30 +1,50 @@
 use crate::executor::host_state::HostState;
 use crate::executor::play_iterator::PlayIterator;
+use crate::executor::task_executor::TaskExecutor;
 use crate::executor::task_queue_manager::TaskQueueManager;
+use crate::executor::WorkerMessage::WorkerMessage;
 use crate::inventory::host::Host;
 use crate::inventory::manager::InventoryManager;
 use crate::playbook::block::BlockEntry;
 use crate::playbook::play::Play;
 use crate::playbook::task::{Action, Task};
 use crate::vars::manager::VariableManager;
+use crate::vars::variable::Variable;
 use anyhow::{anyhow, bail, Result};
 use cogrs_plugins::callback::EventType;
 use log::{debug, warn};
 use std::collections::{HashMap, HashSet};
+use tokio::sync::mpsc;
+use tokio::time::{self, Duration};
 
 /// The linear strategy is simple - get the next task and queue
 ///         it for all hosts, then wait for the queue to drain before
 ///         moving on to the next task
 pub struct LinearStrategy<'a> {
-    tqm: &'a TaskQueueManager,
+    tqm: &'a mut TaskQueueManager,
     inventory_manager: &'a InventoryManager,
     variable_manager: &'a VariableManager,
     host_cache: Vec<String>,
+    blocked_hosts: HashMap<String, bool>,
+    cur_worker: usize,
+    pending_results: u32,
+}
+
+async fn results_thread(mut receiver: mpsc::Receiver<WorkerMessage>) {
+    while let Some(msg) = receiver.recv().await {
+        match msg {
+            WorkerMessage::Callback(msg) => {
+                debug!("received callback from worker: {}", msg);
+            }
+            WorkerMessage::Display(_) => {}
+            WorkerMessage::Prompt(_) => {}
+        }
+    }
 }
 
 impl<'a> LinearStrategy<'a> {
     pub fn new(
-        tqm: &'a TaskQueueManager,
+        tqm: &'a mut TaskQueueManager,
         inventory_manager: &'a InventoryManager,
         variable_manager: &'a VariableManager,
     ) -> Self {
@@ -33,6 +53,9 @@ impl<'a> LinearStrategy<'a> {
             inventory_manager,
             variable_manager,
             host_cache: Vec::new(),
+            blocked_hosts: HashMap::new(),
+            cur_worker: 0,
+            pending_results: 0,
         }
     }
 
@@ -138,11 +161,15 @@ impl<'a> LinearStrategy<'a> {
         let mut work_to_do = true;
         let mut callback_sent = false;
 
+        // TODO: how big of a channel do we want?
+        let (sender, receiver) = mpsc::channel(100);
+        let reader = tokio::spawn(results_thread(receiver));
+
         while work_to_do && !self.tqm.is_terminated() {
             debug!("getting the remaining hosts for this loop");
             let hosts_left = self.get_hosts_left();
 
-            let callback_sent = false;
+            let mut callback_sent = false;
             work_to_do = false;
 
             let host_tasks = self.get_next_task_lockstep(hosts_left.clone(), iterator)?;
@@ -178,11 +205,113 @@ impl<'a> LinearStrategy<'a> {
                                 .emit_event(EventType::PlaybookOnHandlerTaskStart, None)
                                 .await
                         } else {
+                            self.tqm
+                                .emit_event(EventType::PlaybookOnTaskStart, None)
+                                .await
                         }
+
+                        callback_sent = true
                     }
+
+                    self.blocked_hosts.insert(host.name().to_string(), true);
+                    self.queue_task(host, &task, task_vars, sender.clone())
+                        .await?;
                 }
             }
         }
+
+        reader.await?;
+
+        Ok(())
+    }
+
+    fn spawn_new_worker(
+        &mut self,
+        worker_index: usize,
+        sender: mpsc::Sender<WorkerMessage>,
+        host: &Host,
+        task: &Task,
+    ) -> Result<()> {
+        // TODO: figure out what needs to be cloned and what needs Arc
+        let host = host.clone();
+        let task = task.clone();
+
+        let new_worker = tokio::spawn(async move {
+            let executor = TaskExecutor::new();
+            executor.run(&host, &task);
+        });
+        self.tqm.set_worker(worker_index, new_worker);
+        Ok(())
+    }
+
+    /// handles queueing the task up to be sent to a worker
+    async fn queue_task(
+        &mut self,
+        host: &Host,
+        task: &Task,
+        task_vars: HashMap<String, Variable>,
+        sender: mpsc::Sender<WorkerMessage>,
+    ) -> Result<()> {
+        debug!("entering queue_task() for {}/{}", host.name(), task);
+
+        let mut queued = false;
+        let starting_worker = self.cur_worker;
+
+        // Determine the "rewind point" of the worker list. This means we start
+        // iterating over the list of workers until the end of the list is found.
+        // Normally, that is simply the length of the workers list (as determined
+        // by the forks or serial setting), however a task/block/play may "throttle"
+        // that limit down.
+        let mut rewind_point = self.tqm.forks();
+        let throttle = task.throttle();
+
+        if throttle > 0 {
+            if task.run_once() {
+                debug!(
+                    "Ignoring 'throttle' as 'run_once' is also set for '{}'",
+                    task.name()
+                );
+            } else {
+                if throttle <= rewind_point {
+                    debug!("task: {}, throttle: {}", task.name(), throttle);
+                    rewind_point = throttle;
+                }
+            }
+        }
+
+        loop {
+            if self.cur_worker >= rewind_point {
+                self.cur_worker = 0;
+            }
+
+            let worker = self.tqm.get_worker(self.cur_worker);
+
+            if let Some(worker) = worker {
+                if !worker.is_finished() {
+                    self.cur_worker += 1;
+                } else {
+                    self.spawn_new_worker(self.cur_worker, sender.clone(), host, task)?;
+                    queued = true;
+                }
+            } else {
+                self.spawn_new_worker(self.cur_worker, sender.clone(), host, task)?;
+                queued = true;
+            }
+
+            self.cur_worker += 1;
+
+            if self.cur_worker >= rewind_point {
+                self.cur_worker = 0;
+            }
+
+            if queued {
+                break;
+            } else if self.cur_worker == starting_worker {
+                time::sleep(Duration::from_micros(100)).await;
+            }
+        }
+
+        self.pending_results += 1;
 
         Ok(())
     }

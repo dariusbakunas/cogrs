@@ -13,24 +13,34 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 pub struct TaskQueueManager {
-    forks: u32,
+    forks: usize,
     callbacks_loaded: bool,
     callbacks: HashMap<EventType, Vec<Arc<dyn CallbackPlugin>>>,
     terminated: bool,
     unreachable_hosts: HashMap<String, Host>,
+    workers: Vec<tokio::task::JoinHandle<()>>,
 }
 
-const DEFAULT_FORKS: u32 = 5;
+const DEFAULT_FORKS: usize = 5;
 
 impl TaskQueueManager {
-    pub fn new(forks: Option<u32>) -> Self {
+    pub fn new(forks: Option<usize>) -> Self {
         Self {
             callbacks: HashMap::new(),
             callbacks_loaded: false,
             forks: forks.unwrap_or(DEFAULT_FORKS),
             terminated: false,
             unreachable_hosts: HashMap::new(),
+            workers: Vec::with_capacity(forks.unwrap_or(DEFAULT_FORKS)),
         }
+    }
+
+    pub fn get_worker(&mut self, index: usize) -> Option<&tokio::task::JoinHandle<()>> {
+        self.workers.get(index)
+    }
+
+    pub fn set_worker(&mut self, index: usize, worker: tokio::task::JoinHandle<()>) {
+        self.workers.insert(index, worker);
     }
 
     pub async fn run(
@@ -47,7 +57,7 @@ impl TaskQueueManager {
 
         self.emit_event(EventType::PlaybookOnPlayStart, None).await;
 
-        let strategy = play.strategy().clone();
+        let strategy = *play.strategy();
 
         let mut play_iterator = PlayIterator::new(play);
         play_iterator.init(inventory_manager)?;
@@ -56,7 +66,7 @@ impl TaskQueueManager {
 
         match strategy {
             Strategy::Linear => {
-                let mut strategy = LinearStrategy::new(&self, inventory_manager, variable_manager);
+                let mut strategy = LinearStrategy::new(self, inventory_manager, variable_manager);
                 strategy.run(&mut play_iterator).await?;
             }
             Strategy::Free => {
@@ -145,5 +155,9 @@ impl TaskQueueManager {
                 }
             }
         }
+    }
+
+    pub fn forks(&self) -> usize {
+        self.forks
     }
 }

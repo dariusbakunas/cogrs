@@ -427,8 +427,8 @@ impl PlayIterator {
         Ok((host_state, task))
     }
 
-    pub fn batch_size(&self) -> u32 {
-        self.batch_size
+    pub fn batch_size(&self) -> usize {
+        self.batch_size as usize
     }
 
     pub fn play(&self) -> &Play {
