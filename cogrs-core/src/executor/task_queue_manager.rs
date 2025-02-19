@@ -12,6 +12,7 @@ use serde_json::Value;
 use std::cmp::min;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 pub struct TaskQueueManager {
     forks: usize,
@@ -55,10 +56,7 @@ impl TaskQueueManager {
         variable_manager: &VariableManager,
         inventory_manager: &InventoryManager,
     ) -> Result<()> {
-        self.load_callbacks(
-            // TODO: add logic to get callback plugin path
-            "/Users/darius/Programming/cogrs/dist/minimal-apple_x86_64-apple-darwin",
-        );
+        self.load_callbacks().await?;
         let all_vars = variable_manager.get_vars(Some(&play), None, None, true, true);
 
         self.emit_event(EventType::PlaybookOnPlayStart, None).await;
@@ -101,67 +99,13 @@ impl TaskQueueManager {
         self.terminated
     }
 
-    fn load_callbacks(&mut self, plugin_dir: &str) -> Result<()> {
-        // TODO: move this to plugin loader
-        use libloading::{Library, Symbol};
-        use std::fs;
+    async fn load_callbacks(&mut self) -> Result<()> {
+        let plugin_loader = cogrs_plugins::plugin_loader::PluginLoader::instance();
+        let loader = plugin_loader.lock().await;
 
-        let plugin_extension = if cfg!(target_os = "windows") {
-            "dll"
-        } else if cfg!(target_os = "macos") {
-            "dylib"
-        } else {
-            "so"
-        };
-
-        if self.callbacks_loaded {
-            return Ok(());
-        }
-
-        for entry in fs::read_dir(plugin_dir).expect("Invalid plugin directory") {
-            let path = entry.expect("Failed to read entry").path();
-            if path.extension().and_then(|e| e.to_str()) == Some(plugin_extension) {
-                unsafe {
-                    let lib = Library::new(&path).expect("Failed to load plugin");
-
-                    let plugin_type_fn: Symbol<unsafe extern "C" fn() -> u64> =
-                        lib.get(b"plugin_type").unwrap();
-                    let plugin_type_value = plugin_type_fn();
-
-                    // Decode the numeric value into the PluginType enum
-                    let plugin_type = match PluginType::from_u64(plugin_type_value) {
-                        Some(pt) => pt,
-                        None => {
-                            println!("Skipping unknown plugin type {}", plugin_type_value);
-                            continue; // Skip loading this plugin
-                        }
-                    };
-
-                    match plugin_type {
-                        PluginType::Callback => {
-                            let create_callback: Symbol<fn() -> Box<dyn CallbackPlugin>> =
-                                match lib.get(b"create_plugin") {
-                                    Ok(symbol) => symbol,
-                                    Err(_) => {
-                                        println!(
-                                        "Skipping plugin {:?}: missing `create_plugin` function.",
-                                        path
-                                    );
-                                        continue;
-                                    }
-                                };
-
-                            let plugin = create_callback();
-
-                            // Register the plugin for events
-                            self.register_callback(plugin);
-                        }
-                        _ => {
-                            println!("Skipping OtherPlugin: Not supported.");
-                        }
-                    }
-                }
-            }
+        let plugins = loader.get_callback_plugins()?;
+        for plugin in plugins {
+            self.register_callback(plugin);
         }
 
         self.callbacks_loaded = true;

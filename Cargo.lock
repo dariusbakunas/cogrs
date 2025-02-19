@@ -352,7 +352,11 @@ dependencies = [
 name = "cogrs-plugins"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "libloading",
+ "once_cell",
  "serde_json",
+ "tokio",
 ]
 
 [[package]]
