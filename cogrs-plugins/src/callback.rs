@@ -1,4 +1,5 @@
 use serde_json::Value;
+use std::sync::Arc;
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone)]
 pub enum EventType {
@@ -33,7 +34,7 @@ macro_rules! create_callback_plugin {
             }
 
             fn on_event(&self, event: &EventType, data: Option<&serde_json::Value>) {
-                if let Err(e) = (|| -> Result<(), Box<dyn std::error::Error>> {
+                if let Err(e) = (|| -> Result<(), Arc<dyn std::error::Error>> {
                     $handler(event, data)
                 })() {
                     eprintln!("Error in plugin '{}': {:?}", stringify!($plugin_name), e);
@@ -43,8 +44,8 @@ macro_rules! create_callback_plugin {
         }
 
         #[no_mangle]
-        pub fn create_plugin() -> Box<dyn CallbackPlugin> {
-            Box::new($plugin_name)
+        pub fn create_plugin() -> Arc<dyn CallbackPlugin> {
+            Arc::new($plugin_name)
         }
 
         #[no_mangle]

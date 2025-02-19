@@ -7,12 +7,10 @@ use crate::strategy::Strategy;
 use crate::vars::manager::VariableManager;
 use anyhow::Result;
 use cogrs_plugins::callback::{CallbackPlugin, EventType};
-use cogrs_plugins::plugin_type::PluginType;
 use serde_json::Value;
 use std::cmp::min;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 
 pub struct TaskQueueManager {
     forks: usize,
@@ -81,8 +79,7 @@ impl TaskQueueManager {
         Ok(())
     }
 
-    pub fn register_callback(&mut self, callback: Box<dyn CallbackPlugin>) {
-        let callback: Arc<dyn CallbackPlugin> = Arc::from(callback);
+    pub fn register_callback(&mut self, callback: Arc<dyn CallbackPlugin>) {
         for event in callback.get_interested_events() {
             self.callbacks
                 .entry(event)
@@ -103,7 +100,7 @@ impl TaskQueueManager {
         let plugin_loader = cogrs_plugins::plugin_loader::PluginLoader::instance();
         let loader = plugin_loader.lock().await;
 
-        let plugins = loader.get_callback_plugins()?;
+        let plugins = loader.get_callback_plugins().await?;
         for plugin in plugins {
             self.register_callback(plugin);
         }

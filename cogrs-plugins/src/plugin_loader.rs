@@ -2,18 +2,30 @@ use crate::callback::CallbackPlugin;
 use crate::plugin_type::PluginType;
 use anyhow::Result;
 use once_cell::sync::Lazy;
+use std::sync::Arc;
 use tokio::sync::Mutex;
 
-pub struct PluginLoader {}
+pub struct PluginLoader {
+    cached_callback_plugins: Mutex<Option<Vec<Arc<dyn CallbackPlugin>>>>,
+}
 
 impl PluginLoader {
     // Define methods or associated functions if needed
     fn new() -> Self {
-        PluginLoader {}
+        PluginLoader {
+            cached_callback_plugins: Mutex::new(None),
+        }
     }
 
-    pub fn get_callback_plugins(&self) -> Result<Vec<Box<dyn CallbackPlugin>>> {
-        let mut plugins = Vec::new();
+    pub async fn get_callback_plugins(&self) -> Result<Vec<Arc<dyn CallbackPlugin>>> {
+        {
+            let cache = self.cached_callback_plugins.lock().await;
+            if let Some(cached) = &*cache {
+                return Ok(cached.clone());
+            }
+        }
+
+        let mut plugins: Vec<Arc<dyn CallbackPlugin>> = Vec::new();
         // TODO: make this configurable
         let plugin_dir = "/Users/darius/Programming/cogrs/dist/minimal-apple_x86_64-apple-darwin";
 
@@ -49,7 +61,7 @@ impl PluginLoader {
 
                     match plugin_type {
                         PluginType::Callback => {
-                            let create_callback: Symbol<fn() -> Box<dyn CallbackPlugin>> =
+                            let create_callback: Symbol<fn() -> Arc<dyn CallbackPlugin>> =
                                 match lib.get(b"create_plugin") {
                                     Ok(symbol) => symbol,
                                     Err(_) => {
@@ -73,6 +85,9 @@ impl PluginLoader {
                 }
             }
         }
+
+        let mut cache = self.cached_callback_plugins.lock().await;
+        *cache = Some(plugins.clone());
 
         Ok(plugins)
     }
