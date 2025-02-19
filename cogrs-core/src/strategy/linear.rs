@@ -187,6 +187,7 @@ impl<'a> LinearStrategy<'a> {
                     .inventory_manager
                     .get_host(&host)
                     .ok_or(anyhow!("Host not found: {}", host))?;
+
                 let task_vars = self.variable_manager.get_vars(
                     Some(iterator.play()),
                     Some(host),

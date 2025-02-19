@@ -7,6 +7,7 @@ use crate::strategy::Strategy;
 use crate::vars::manager::VariableManager;
 use anyhow::Result;
 use cogrs_plugins::callback::{CallbackPlugin, EventType};
+use cogrs_plugins::plugin_type::PluginType;
 use serde_json::Value;
 use std::cmp::min;
 use std::collections::HashMap;
@@ -67,7 +68,7 @@ impl TaskQueueManager {
         let mut play_iterator = PlayIterator::new(play);
         play_iterator.init(inventory_manager)?;
 
-        let forks = min(self.forks, play_iterator.batch_size());
+        self.forks = min(self.forks, play_iterator.batch_size());
 
         match strategy {
             Strategy::Linear => {
@@ -100,7 +101,8 @@ impl TaskQueueManager {
         self.terminated
     }
 
-    fn load_callbacks(&mut self, plugin_dir: &str) {
+    fn load_callbacks(&mut self, plugin_dir: &str) -> Result<()> {
+        // TODO: move this to plugin loader
         use libloading::{Library, Symbol};
         use std::fs;
 
@@ -113,7 +115,7 @@ impl TaskQueueManager {
         };
 
         if self.callbacks_loaded {
-            return;
+            return Ok(());
         }
 
         for entry in fs::read_dir(plugin_dir).expect("Invalid plugin directory") {
@@ -122,20 +124,48 @@ impl TaskQueueManager {
                 unsafe {
                     let lib = Library::new(&path).expect("Failed to load plugin");
 
-                    // Dynamically load the callback creation function
-                    let create_callback: Symbol<fn() -> Box<dyn CallbackPlugin>> = lib
-                        .get(b"create_plugin")
-                        .expect("Failed to find create_plugin function");
+                    let plugin_type_fn: Symbol<unsafe extern "C" fn() -> u64> =
+                        lib.get(b"plugin_type").unwrap();
+                    let plugin_type_value = plugin_type_fn();
 
-                    let plugin = create_callback();
+                    // Decode the numeric value into the PluginType enum
+                    let plugin_type = match PluginType::from_u64(plugin_type_value) {
+                        Some(pt) => pt,
+                        None => {
+                            println!("Skipping unknown plugin type {}", plugin_type_value);
+                            continue; // Skip loading this plugin
+                        }
+                    };
 
-                    // Register the plugin for events
-                    self.register_callback(plugin);
+                    match plugin_type {
+                        PluginType::Callback => {
+                            let create_callback: Symbol<fn() -> Box<dyn CallbackPlugin>> =
+                                match lib.get(b"create_plugin") {
+                                    Ok(symbol) => symbol,
+                                    Err(_) => {
+                                        println!(
+                                        "Skipping plugin {:?}: missing `create_plugin` function.",
+                                        path
+                                    );
+                                        continue;
+                                    }
+                                };
+
+                            let plugin = create_callback();
+
+                            // Register the plugin for events
+                            self.register_callback(plugin);
+                        }
+                        _ => {
+                            println!("Skipping OtherPlugin: Not supported.");
+                        }
+                    }
                 }
             }
         }
 
-        self.callbacks_loaded = true
+        self.callbacks_loaded = true;
+        Ok(())
     }
 
     pub async fn emit_event(&self, event: EventType, data: Option<Value>) {

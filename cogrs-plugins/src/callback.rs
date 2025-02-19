@@ -46,5 +46,10 @@ macro_rules! create_callback_plugin {
         pub fn create_plugin() -> Box<dyn CallbackPlugin> {
             Box::new($plugin_name)
         }
+
+        #[no_mangle]
+        pub extern "C" fn plugin_type() -> u64 {
+            PluginType::Callback.id()
+        }
     };
 }
