@@ -15,6 +15,7 @@ pub struct AdHocOptions {
     pub task_timeout: Option<u64>,
     pub async_val: Option<u64>,
     pub one_line: bool,
+    pub connection: String,
 }
 
 impl AdHoc {
@@ -47,6 +48,7 @@ impl AdHoc {
         let play = Play::builder("CogRS Ad-Hoc", &roles)
             .use_become(false)
             .gather_facts(false)
+            .connection(&options.connection)
             .pattern(pattern)
             .limit(limit)
             .tasks(&tasks)

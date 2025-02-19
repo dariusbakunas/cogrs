@@ -33,8 +33,8 @@ pub struct LinearStrategy<'a> {
 async fn results_thread(mut receiver: mpsc::Receiver<WorkerMessage>) {
     while let Some(msg) = receiver.recv().await {
         match msg {
-            WorkerMessage::Callback(msg) => {
-                debug!("received callback from worker: {}", msg);
+            WorkerMessage::Callback((event, task_result)) => {
+                debug!("received callback from worker: {:?}", event);
             }
             WorkerMessage::Display(_) => {}
             WorkerMessage::Prompt(_) => {}
@@ -238,7 +238,7 @@ impl<'a> LinearStrategy<'a> {
 
         let new_worker = tokio::spawn(async move {
             let executor = TaskExecutor::new();
-            executor.run(&host, &task);
+            let result = executor.run(&host, &task, &sender);
         });
         self.tqm.set_worker(worker_index, new_worker);
         Ok(())

@@ -5,12 +5,12 @@ use std::path::PathBuf;
 #[derive(Parser, Debug)]
 #[command(version = env!("APP_VERSION"), about, long_about = None)]
 pub struct Cli {
-    #[arg(short, long, value_name = "FILE")]
-    config: Option<PathBuf>,
-
     /// outputs a list of matching hosts; does not execute anything else
     #[arg(long, action)]
     pub list_hosts: bool,
+
+    #[arg(short, long, value_name = "CONNECTION", default_value = "ssh")]
+    pub connection: String,
 
     /// the action's options as json string: -a '{"opt1": "val1", "opt2": "val2"}'
     /// should match module schema, to get schema run: `module_name --schema`

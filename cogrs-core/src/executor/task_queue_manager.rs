@@ -43,6 +43,11 @@ impl TaskQueueManager {
         self.workers.insert(index, worker);
     }
 
+    /// Iterates over the roles/tasks in a play, using the given (or default)
+    /// strategy for queueing tasks. The default is the linear strategy, which
+    /// operates like classic Ansible by keeping all hosts in lock-step with
+    /// a given task (meaning no hosts move on to the next task until all hosts
+    /// are done with the current task).
     pub async fn run(
         &mut self,
         play: Play,

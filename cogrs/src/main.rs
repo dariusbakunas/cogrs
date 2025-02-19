@@ -33,6 +33,7 @@ async fn run() -> Result<()> {
     } else if let Some(module_name) = cli.module_name {
         let options = AdHocOptions {
             forks: cli.forks,
+            connection: cli.connection,
             poll_interval: Some(cli.poll_interval),
             task_timeout: cli.task_timeout,
             async_val: cli.async_val,
