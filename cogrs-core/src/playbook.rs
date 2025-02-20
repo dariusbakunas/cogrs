@@ -3,8 +3,8 @@ use play::Play;
 pub mod block;
 pub mod handler;
 pub mod play;
-mod play_builder;
-mod play_context;
+pub mod play_builder;
+pub mod play_context;
 pub mod role;
 pub mod task;
 

@@ -1,11 +1,13 @@
 use crate::executor::task_queue_manager::TaskQueueManager;
 use crate::inventory::manager::InventoryManager;
 use crate::playbook::play::Play;
+use crate::playbook::play_context::PlayContextBuilder;
 use crate::playbook::task::{Action, TaskBuilder};
 use crate::playbook::Playbook;
 use crate::vars::manager::VariableManager;
 use anyhow::Result;
 use log::info;
+use std::path::PathBuf;
 
 pub struct AdHoc;
 
@@ -16,6 +18,8 @@ pub struct AdHocOptions {
     pub async_val: Option<u64>,
     pub one_line: bool,
     pub connection: String,
+    pub connection_timeout: Option<u64>,
+    pub private_key_file: Option<PathBuf>,
 }
 
 impl AdHoc {
@@ -56,7 +60,12 @@ impl AdHoc {
 
         let _playbook = Playbook::new("__adhoc_playbook__", &[play.clone()]);
 
-        let mut tqm = TaskQueueManager::new(Some(options.forks as usize));
+        let play_context = PlayContextBuilder::new()
+            .connection_timeout(options.connection_timeout)
+            .private_key_file(options.private_key_file.as_ref())
+            .build();
+
+        let mut tqm = TaskQueueManager::new(Some(options.forks as usize), &play_context);
         tqm.run(play, &variable_manager, inventory_manager).await?;
 
         Ok(())

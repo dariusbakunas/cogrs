@@ -69,7 +69,7 @@ archives:
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
     builds:
-      - cogrs  # Associate this archive with the cogrs build
+      - cogrs
     format_overrides:
       - goos: windows
         format: zip
@@ -83,7 +83,7 @@ archives:
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
     builds:
-      - command  # Associate this archive with the command build
+      - command
     format_overrides:
       - goos: windows
         format: zip

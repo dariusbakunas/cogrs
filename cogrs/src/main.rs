@@ -38,6 +38,8 @@ async fn run() -> Result<()> {
             task_timeout: cli.task_timeout,
             async_val: cli.async_val,
             one_line: cli.one_line,
+            connection_timeout: cli.connection_timeout,
+            private_key_file: cli.private_key_file,
         };
 
         AdHoc::run(
