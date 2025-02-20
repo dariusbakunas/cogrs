@@ -99,16 +99,36 @@ pub fn get_vars_from_inventory_sources(
     Ok(vars)
 }
 
+pub enum ConflictResolution {
+    Replace,
+    Merge,
+}
+
 pub fn combine_variables(
     a: &IndexMap<String, Variable>,
     b: &IndexMap<String, Variable>,
+    strategy: &ConflictResolution,
 ) -> IndexMap<String, Variable> {
     let mut result = a.clone();
 
-    // default behavior in Ansible is 'replace'
     for (key, value) in b {
-        result.insert(key.clone(), value.clone());
+        match strategy {
+            ConflictResolution::Replace => {
+                result.insert(key.clone(), value.clone());
+            }
+            ConflictResolution::Merge => {
+                if let (Some(Variable::Mapping(a_map)), Variable::Mapping(b_map)) =
+                    (result.get(key), value)
+                {
+                    let merged = combine_variables(&a_map.map, &b_map.map, strategy);
+                    result.insert(key.clone(), Variable::Mapping(Mapping { map: merged }));
+                } else {
+                    result.insert(key.clone(), value.clone());
+                }
+            }
+        }
     }
+
     result
 }
 
@@ -164,7 +184,7 @@ mod tests {
         let mut map_b = IndexMap::new();
         map_b.insert("key2".to_string(), Variable::String("hello".to_string()));
 
-        let result = combine_variables(&map_a, &map_b);
+        let result = combine_variables(&map_a, &map_b, &ConflictResolution::Replace);
 
         assert_eq!(result.len(), 2);
         assert_eq!(result["key1"], Variable::Bool(true));
@@ -181,7 +201,7 @@ mod tests {
         map_b.insert("key2".to_string(), Variable::Number(Number::Float(3.14))); // overwrites key2
         map_b.insert("key3".to_string(), Variable::String("world".to_string()));
 
-        let result = combine_variables(&map_a, &map_b);
+        let result = combine_variables(&map_a, &map_b, &ConflictResolution::Replace);
 
         assert_eq!(result.len(), 3);
         assert_eq!(result["key1"], Variable::Bool(true));
@@ -193,7 +213,7 @@ mod tests {
     fn test_combine_empty_maps() {
         let map_a: IndexMap<String, Variable> = IndexMap::new();
         let map_b: IndexMap<String, Variable> = IndexMap::new();
-        let result = combine_variables(&map_a, &map_b);
+        let result = combine_variables(&map_a, &map_b, &ConflictResolution::Replace);
         assert!(result.is_empty());
     }
 
@@ -204,7 +224,7 @@ mod tests {
 
         let map_b: IndexMap<String, Variable> = IndexMap::new();
 
-        let result = combine_variables(&map_a.clone(), &map_b);
+        let result = combine_variables(&map_a.clone(), &map_b, &ConflictResolution::Replace);
 
         assert_eq!(result.len(), 1);
         assert_eq!(result["key1"], map_a["key1"]);
@@ -217,7 +237,7 @@ mod tests {
         let mut map_b = IndexMap::new();
         map_b.insert("key1".to_string(), Variable::Number(Number::Int(5)));
 
-        let result = combine_variables(&map_a, &map_b.clone());
+        let result = combine_variables(&map_a, &map_b.clone(), &ConflictResolution::Replace);
 
         assert_eq!(result.len(), 1);
         assert_eq!(result["key1"], map_b["key1"]);

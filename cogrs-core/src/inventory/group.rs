@@ -1,6 +1,6 @@
 use crate::inventory::host::Host;
 use crate::inventory::utils::difference_update_vec;
-use crate::vars::variable::{combine_variables, Variable};
+use crate::vars::variable::{combine_variables, ConflictResolution, Variable};
 use anyhow::{bail, Result};
 use indexmap::{IndexMap, IndexSet};
 use log::{debug, warn};
@@ -248,7 +248,7 @@ impl Group {
     }
 
     pub fn combine_vars(&mut self, vars: &IndexMap<String, Variable>) {
-        let combined = combine_variables(&self.vars, vars);
+        let combined = combine_variables(&self.vars, vars, &ConflictResolution::Replace);
         self.vars = combined;
     }
 

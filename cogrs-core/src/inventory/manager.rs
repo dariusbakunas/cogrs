@@ -4,7 +4,9 @@ use crate::constants::LOCALHOST;
 use crate::inventory::patterns::PatternResolver;
 use crate::inventory::utils::{glob_to_regex, split_subscript};
 use crate::parsing::parser::InventoryParser;
-use crate::vars::variable::{combine_variables, get_vars_from_inventory_sources};
+use crate::vars::variable::{
+    combine_variables, get_vars_from_inventory_sources, ConflictResolution,
+};
 use anyhow::Result;
 use indexmap::IndexMap;
 use log::{debug, warn};
@@ -128,7 +130,11 @@ impl InventoryManager {
             }
 
             if host.is_implicit() {
-                let vars = combine_variables(&all_group.get_vars(), &host.vars());
+                let vars = combine_variables(
+                    &all_group.get_vars(),
+                    &host.vars(),
+                    &ConflictResolution::Replace,
+                );
                 host.set_vars(vars);
             }
         }
