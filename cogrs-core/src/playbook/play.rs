@@ -158,6 +158,10 @@ impl Play {
         self.finalized
     }
 
+    pub fn force_handlers(&self) -> bool {
+        self.force_handlers
+    }
+
     pub fn roles(&self) -> &Vec<Role> {
         &self.roles
     }

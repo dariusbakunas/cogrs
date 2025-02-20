@@ -2,7 +2,6 @@ use crate::executor::play_iterator::PlayIterator;
 use crate::inventory::host::Host;
 use crate::inventory::manager::InventoryManager;
 use crate::playbook::play::Play;
-use crate::playbook::play_context::{PlayContext, PlayContextBuilder};
 use crate::strategy::linear::LinearStrategy;
 use crate::strategy::Strategy;
 use crate::vars::manager::VariableManager;
@@ -20,13 +19,12 @@ pub struct TaskQueueManager {
     terminated: bool,
     unreachable_hosts: HashMap<String, Host>,
     workers: Vec<tokio::task::JoinHandle<()>>,
-    play_context: PlayContext,
 }
 
 const DEFAULT_FORKS: usize = 5;
 
 impl TaskQueueManager {
-    pub fn new(forks: Option<usize>, play_context: &PlayContext) -> Self {
+    pub fn new(forks: Option<usize>) -> Self {
         Self {
             callbacks: HashMap::new(),
             callbacks_loaded: false,
@@ -34,12 +32,7 @@ impl TaskQueueManager {
             terminated: false,
             unreachable_hosts: HashMap::new(),
             workers: Vec::with_capacity(forks.unwrap_or(DEFAULT_FORKS)),
-            play_context: (*play_context).clone(),
         }
-    }
-
-    pub fn play_context(&self) -> &PlayContext {
-        &self.play_context
     }
 
     pub fn get_worker(&mut self, index: usize) -> Option<&tokio::task::JoinHandle<()>> {

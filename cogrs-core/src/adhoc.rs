@@ -1,7 +1,6 @@
 use crate::executor::task_queue_manager::TaskQueueManager;
 use crate::inventory::manager::InventoryManager;
 use crate::playbook::play::Play;
-use crate::playbook::play_context::PlayContextBuilder;
 use crate::playbook::task::{Action, TaskBuilder};
 use crate::playbook::Playbook;
 use crate::vars::manager::VariableManager;
@@ -60,12 +59,7 @@ impl AdHoc {
 
         let _playbook = Playbook::new("__adhoc_playbook__", &[play.clone()]);
 
-        let play_context = PlayContextBuilder::new()
-            .connection_timeout(options.connection_timeout)
-            .private_key_file(options.private_key_file.as_ref())
-            .build();
-
-        let mut tqm = TaskQueueManager::new(Some(options.forks as usize), &play_context);
+        let mut tqm = TaskQueueManager::new(Some(options.forks as usize));
         tqm.run(play, &variable_manager, inventory_manager).await?;
 
         Ok(())

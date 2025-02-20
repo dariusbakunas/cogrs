@@ -7,7 +7,6 @@ use crate::inventory::host::Host;
 use crate::inventory::manager::InventoryManager;
 use crate::playbook::block::BlockEntry;
 use crate::playbook::play::Play;
-use crate::playbook::play_context::PlayContext;
 use crate::playbook::task::{Action, Task};
 use crate::vars::manager::VariableManager;
 use crate::vars::variable::Variable;
@@ -216,14 +215,8 @@ impl<'a> LinearStrategy<'a> {
                     }
 
                     self.blocked_hosts.insert(host.name().to_string(), true);
-                    self.queue_task(
-                        host,
-                        &task,
-                        task_vars,
-                        sender.clone(),
-                        self.tqm.play_context().clone(),
-                    )
-                    .await?;
+                    self.queue_task(host, &task, task_vars, sender.clone())
+                        .await?;
                 }
             }
         }
@@ -239,7 +232,6 @@ impl<'a> LinearStrategy<'a> {
         sender: mpsc::Sender<WorkerMessage>,
         host: &Host,
         task: &Task,
-        play_context: &PlayContext,
     ) -> Result<()> {
         // TODO: figure out what needs to be cloned and what needs Arc
         let host = host.clone();
@@ -260,7 +252,6 @@ impl<'a> LinearStrategy<'a> {
         task: &Task,
         task_vars: HashMap<String, Variable>,
         sender: mpsc::Sender<WorkerMessage>,
-        play_context: PlayContext,
     ) -> Result<()> {
         debug!("entering queue_task() for {}/{}", host.name(), task);
 
@@ -300,17 +291,11 @@ impl<'a> LinearStrategy<'a> {
                 if !worker.is_finished() {
                     self.cur_worker += 1;
                 } else {
-                    self.spawn_new_worker(
-                        self.cur_worker,
-                        sender.clone(),
-                        host,
-                        task,
-                        &play_context,
-                    )?;
+                    self.spawn_new_worker(self.cur_worker, sender.clone(), host, task)?;
                     queued = true;
                 }
             } else {
-                self.spawn_new_worker(self.cur_worker, sender.clone(), host, task, &play_context)?;
+                self.spawn_new_worker(self.cur_worker, sender.clone(), host, task)?;
                 queued = true;
             }
 
