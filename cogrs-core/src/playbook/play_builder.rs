@@ -5,7 +5,7 @@ use crate::playbook::role::Role;
 use crate::playbook::task::Task;
 use crate::strategy::Strategy;
 use crate::vars::variable::Variable;
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 const GATHER_TIMEOUT_DEFAULT: u32 = 10;
 
@@ -37,7 +37,7 @@ pub struct PlayBuilder {
     throttle: u32,
     timeout: u32,
     use_become: bool,
-    vars: HashMap<String, Variable>,
+    vars: IndexMap<String, Variable>,
     vars_files: Vec<String>,
 }
 
@@ -71,7 +71,7 @@ impl PlayBuilder {
             throttle: 0,
             timeout: 0,
             use_become: false,
-            vars: HashMap::new(),
+            vars: IndexMap::new(),
             vars_files: Vec::new(),
         }
     }

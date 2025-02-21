@@ -8,7 +8,7 @@ use std::collections::HashSet;
 
 #[derive(Clone, Debug)]
 pub struct Group {
-    pub name: String,
+    name: String,
     depth: u32,
     priority: i64,
     vars: IndexMap<String, Variable>,
@@ -28,6 +28,10 @@ impl Group {
             child_groups: Vec::new(),
             parent_groups: Vec::new(),
         }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     pub fn add_host(&mut self, host_name: &str) {

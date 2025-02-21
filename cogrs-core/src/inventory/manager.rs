@@ -11,7 +11,7 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use log::{debug, warn};
 use regex::Regex;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 pub struct HostManager;
@@ -53,9 +53,9 @@ impl InventoryManager {
             .clone();
 
         all_group.add_child_group(&mut ungrouped_group, &mut self.groups, &mut self.hosts)?;
-        self.groups.insert(all_group.name.clone(), all_group);
+        self.groups.insert(all_group.name().to_string(), all_group);
         self.groups
-            .insert(ungrouped_group.name.clone(), ungrouped_group);
+            .insert(ungrouped_group.name().to_string(), ungrouped_group);
 
         Ok(())
     }
@@ -79,7 +79,7 @@ impl InventoryManager {
 
         for (group_name, group) in &self.groups {
             if group_name != "all" && !group.has_ancestors() {
-                children_to_add.push(group.name.clone());
+                children_to_add.push(group.name().to_string());
             }
         }
 
@@ -97,10 +97,10 @@ impl InventoryManager {
                 .clone();
 
             all_group.add_child_group(&mut group, &mut self.groups, &mut self.hosts)?;
-            self.groups.insert(group.name.clone(), group);
+            self.groups.insert(group.name().to_string(), group);
         }
 
-        self.groups.insert(all_group.name.clone(), all_group);
+        self.groups.insert(all_group.name().to_string(), all_group);
         Ok(())
     }
 
@@ -240,6 +240,21 @@ impl InventoryManager {
             .iter()
             .filter_map(|host| self.get_host(host).cloned())
             .collect())
+    }
+
+    pub fn get_groups_dict(&self) -> IndexMap<String, Vec<String>> {
+        let mut groups_dict = IndexMap::new();
+
+        for (group_name, group) in &self.groups {
+            // Get a set of hosts directly in the group and not in descendant groups
+            let direct_hosts = group
+                .get_hosts(&self.groups, true)
+                .unwrap_or_else(|_| Vec::new());
+
+            groups_dict.insert(group_name.clone(), direct_hosts);
+        }
+
+        groups_dict
     }
 
     fn apply_patterns(&self, patterns: &[String]) -> Result<Vec<String>> {

@@ -96,8 +96,8 @@ fn parse_group(
 
             parent_group.add_child_group(&mut child_group, groups, hosts)?;
 
-            groups.insert(parent_group.name.clone(), parent_group);
-            groups.insert(child_group.name.clone(), child_group);
+            groups.insert(parent_group.name().to_string(), parent_group);
+            groups.insert(child_group.name().to_string(), child_group);
         }
     }
 
@@ -106,7 +106,7 @@ fn parse_group(
 
 /// Parses "vars" for the group.
 fn parse_group_vars(group: &mut Group, val: &Value) -> Result<()> {
-    info!("Parsing vars in group: {}", group.name);
+    info!("Parsing vars in group: {}", group.name());
     if let Value::Mapping(val) = val {
         for (key, val) in val.iter() {
             if let Value::String(key) = key {
@@ -175,7 +175,7 @@ fn parse_group_hosts(
                         .entry(host_name.to_string())
                         .or_insert_with(|| Host::new(&host_name));
                     group.add_host(&host.name());
-                    host.add_group(&group.name);
+                    host.add_group(&group.name());
                     populate_host_vars(host, group, host_data, source)?;
                 }
             }

@@ -5,7 +5,9 @@ use crate::playbook::role::Role;
 use crate::playbook::task::{Action, Task, TaskBuilder};
 use crate::strategy::Strategy;
 use crate::vars::variable::Variable;
+use indexmap::IndexMap;
 use std::collections::HashMap;
+use std::ops::Index;
 
 #[derive(Clone)]
 pub struct Play {
@@ -36,7 +38,7 @@ pub struct Play {
     throttle: u32,
     timeout: u32,
     use_become: bool,
-    vars: HashMap<String, Variable>,
+    vars: IndexMap<String, Variable>,
     vars_files: Vec<String>,
 }
 
@@ -70,7 +72,7 @@ impl Play {
         throttle: u32,
         timeout: u32,
         use_become: bool,
-        vars: HashMap<String, Variable>,
+        vars: IndexMap<String, Variable>,
         vars_files: Vec<String>,
     ) -> Self {
         Play {
@@ -114,7 +116,7 @@ impl Play {
         &self.tasks
     }
 
-    pub fn vars(&self) -> &HashMap<String, Variable> {
+    pub fn vars(&self) -> &IndexMap<String, Variable> {
         &self.vars
     }
 

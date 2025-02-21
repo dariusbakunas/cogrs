@@ -23,8 +23,27 @@ impl Number {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Mapping {
-    // TODO: do we need IndexMap here? or could we just use regular HashMap
-    map: IndexMap<String, Variable>,
+    pub(crate) map: IndexMap<String, Variable>,
+}
+
+impl From<IndexMap<String, Variable>> for Mapping {
+    fn from(map: IndexMap<String, Variable>) -> Self {
+        Mapping { map }
+    }
+}
+
+impl From<IndexMap<String, Vec<String>>> for Mapping {
+    fn from(map: IndexMap<String, Vec<String>>) -> Self {
+        let mut result = Mapping::new();
+        for (key, value) in map {
+            let sequence: Vec<Variable> = value
+                .iter()
+                .map(|s| Variable::String(s.to_string()))
+                .collect();
+            result.insert(key, Variable::Sequence(sequence));
+        }
+        result
+    }
 }
 
 impl Mapping {
@@ -32,6 +51,16 @@ impl Mapping {
         MappingIter {
             inner: self.map.iter(),
         }
+    }
+
+    pub fn new() -> Self {
+        Mapping {
+            map: IndexMap::new(),
+        }
+    }
+
+    pub fn insert(&mut self, key: String, value: Variable) {
+        self.map.insert(key, value);
     }
 }
 

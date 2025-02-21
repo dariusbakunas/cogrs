@@ -55,7 +55,7 @@ impl TaskQueueManager {
         inventory_manager: &InventoryManager,
     ) -> Result<()> {
         self.load_callbacks().await?;
-        let all_vars = variable_manager.get_vars(Some(&play), None, None, true, true);
+        let all_vars = variable_manager.get_vars(Some(&play), None, None, None, true, true);
 
         self.emit_event(EventType::PlaybookOnPlayStart, None).await;
 

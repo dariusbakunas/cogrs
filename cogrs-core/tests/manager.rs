@@ -21,7 +21,7 @@ fn setup_inventory_manager(inventory_file: &str) -> Result<InventoryManager> {
 
 fn validate_groups(inventory_manager: &InventoryManager, expected_groups: &[&str]) {
     let groups = inventory_manager.list_groups();
-    let actual_names: Vec<String> = groups.iter().map(|g| g.name.clone()).collect();
+    let actual_names: Vec<String> = groups.iter().map(|g| g.name().to_string()).collect();
 
     if actual_names != expected_groups {
         panic!(

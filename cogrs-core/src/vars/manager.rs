@@ -1,7 +1,10 @@
 use crate::inventory::host::Host;
+use crate::inventory::manager::InventoryManager;
 use crate::playbook::play::Play;
 use crate::playbook::task::Task;
-use crate::vars::variable::Variable;
+use crate::vars::variable::{combine_variables, ConflictResolution, Mapping, Variable};
+use indexmap::IndexMap;
+use log::debug;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -18,18 +21,16 @@ impl VariableManager {
 
     fn combine_and_track(
         &self,
-        vars: &mut HashMap<String, Variable>,
-        new_vars: &HashMap<String, Variable>,
-    ) {
+        vars: &IndexMap<String, Variable>,
+        new_vars: &IndexMap<String, Variable>,
+    ) -> IndexMap<String, Variable> {
         if new_vars.is_empty() {
-            return;
+            return vars.clone();
         }
 
         // TODO: see if we need to add tracking of sources here
 
-        for (key, value) in new_vars {
-            vars.insert(key.clone(), value.clone());
-        }
+        combine_variables(vars, new_vars, &ConflictResolution::Replace)
     }
 
     /// Returns the variables, with optional "context" given via the parameters
@@ -63,12 +64,13 @@ impl VariableManager {
         play: Option<&Play>,
         host: Option<&Host>,
         task: Option<&Task>,
+        inventory_manager: Option<&InventoryManager>,
         include_hostvars: bool,
         use_cache: bool,
-    ) -> HashMap<String, Variable> {
-        let mut all_vars = HashMap::new();
+    ) -> IndexMap<String, Variable> {
+        let mut all_vars = IndexMap::new();
 
-        let magic_vars = self.get_magic_vars(play, host, task, include_hostvars);
+        let magic_vars = self.get_magic_vars(play, host, task, inventory_manager, include_hostvars);
 
         if let Some(play) = play {
             // get role defaults (lowest precedence)
@@ -86,7 +88,7 @@ impl VariableManager {
         }
 
         if let Some(play) = play {
-            self.combine_and_track(&mut all_vars, play.vars());
+            all_vars = self.combine_and_track(&all_vars, play.vars());
 
             let var_files = play.vars_files();
             for var_file in var_files {
@@ -121,7 +123,7 @@ impl VariableManager {
 
         // TODO: check for any reserved vars
 
-        self.combine_and_track(&mut all_vars, &magic_vars);
+        all_vars = self.combine_and_track(&mut all_vars, &magic_vars);
 
         // special case for the 'environment' magic variable, as someone
         // may have set it as a variable and we don't want to stomp on it
@@ -138,9 +140,10 @@ impl VariableManager {
         play: Option<&Play>,
         host: Option<&Host>,
         task: Option<&Task>,
+        inventory_manager: Option<&InventoryManager>,
         include_hostvars: bool,
-    ) -> HashMap<String, Variable> {
-        let mut magic_vars: HashMap<String, Variable> = HashMap::new();
+    ) -> IndexMap<String, Variable> {
+        let mut magic_vars: IndexMap<String, Variable> = IndexMap::new();
 
         magic_vars.insert(
             String::from("playbook_dir"),
@@ -149,6 +152,19 @@ impl VariableManager {
 
         if let Some(play) = play {
             // TODO: get all role names and assign to cogrs_role_names
+            magic_vars.insert(
+                String::from("cogrs_role_names"),
+                Variable::Sequence(Vec::new()),
+            );
+            magic_vars.insert(
+                String::from("cogrs_play_role_names"),
+                Variable::Sequence(Vec::new()),
+            );
+            magic_vars.insert(
+                String::from("cogrs_dependent_role_names"),
+                Variable::Sequence(Vec::new()),
+            );
+
             // TODO: handle task role if any
             magic_vars.insert(
                 String::from("cogrs_play_name"),
@@ -157,7 +173,26 @@ impl VariableManager {
         }
 
         if let Some(task) = task {
-            // TODO: get magic vars for task
+            if let Some(role) = task.role() {
+                magic_vars.insert(
+                    String::from("role_name"),
+                    Variable::String(role.name().to_string()),
+                );
+                magic_vars.insert(
+                    String::from("role_path"),
+                    Variable::Path(role.path().to_path_buf()),
+                );
+                magic_vars.insert(
+                    String::from("role_uuid"),
+                    Variable::String(role.uuid().to_string()),
+                );
+            }
+        }
+
+        if let Some(inventory_manager) = inventory_manager {
+            let groups: Mapping = inventory_manager.get_groups_dict().into();
+            debug!("magic_vars groups: {:?}", groups);
+            magic_vars.insert(String::from("groups"), Variable::Mapping(groups));
         }
 
         // TODO: set groups var
