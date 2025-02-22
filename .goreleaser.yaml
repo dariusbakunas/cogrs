@@ -58,6 +58,17 @@ builds:
     targets:
       - x86_64-apple-darwin
       - aarch64-apple-darwin
+  - builder: rust
+    id: ssh-apple
+    binary: libssh.dylib
+    flags:
+      - --release
+      - -p=ssh
+    env:
+      - CGO_ENABLED=1
+    targets:
+      - x86_64-apple-darwin
+      - aarch64-apple-darwin
 
 archives:
   - format: tar.gz
