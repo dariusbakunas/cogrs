@@ -59,3 +59,86 @@ macro_rules! create_callback_plugin {
         }
     };
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::plugin_type::PluginType;
+    use serde_json::json;
+
+    #[test]
+    fn test_get_interested_events() {
+        struct MockHandlerPlugin;
+
+        impl CallbackPlugin for MockHandlerPlugin {
+            fn get_interested_events(&self) -> Vec<EventType> {
+                vec![EventType::RunnerOnFailed, EventType::RunnerOnOk]
+            }
+
+            fn on_event(&self, _event: &EventType, _data: Option<&Value>) {
+                // Do nothing
+            }
+        }
+
+        let plugin = MockHandlerPlugin;
+        let events = plugin.get_interested_events();
+
+        assert!(events.contains(&EventType::RunnerOnFailed));
+        assert!(events.contains(&EventType::RunnerOnOk));
+        assert_eq!(events.len(), 2);
+    }
+
+    #[test]
+    fn test_on_event_execution() {
+        struct MockHandlerPlugin;
+
+        impl CallbackPlugin for MockHandlerPlugin {
+            fn get_interested_events(&self) -> Vec<EventType> {
+                vec![EventType::RunnerOnOk]
+            }
+
+            fn on_event(&self, event: &EventType, data: Option<&Value>) {
+                assert_eq!(event, &EventType::RunnerOnOk);
+                if let Some(json) = data {
+                    assert_eq!(json["key"], "value");
+                }
+            }
+        }
+
+        let plugin = MockHandlerPlugin;
+
+        // Trigger the event
+        let data = json!({"key": "value"});
+        plugin.on_event(&EventType::RunnerOnOk, Some(&data));
+    }
+
+    #[test]
+    fn test_macro_generated_plugin() {
+        fn custom_handler(
+            event: &EventType,
+            data: Option<&Value>,
+        ) -> Result<(), Arc<dyn std::error::Error>> {
+            if let Some(json) = data {
+                assert_eq!(event, &EventType::RunnerOnOk);
+                assert_eq!(json["key"], "value");
+            }
+            Ok(())
+        }
+
+        create_callback_plugin!(
+            TestPlugin,
+            "test_plugin",
+            [EventType::RunnerOnOk],
+            custom_handler
+        );
+
+        let plugin = TestPlugin;
+        let events = plugin.get_interested_events();
+        assert!(events.contains(&EventType::RunnerOnOk));
+        assert_eq!(events.len(), 1);
+
+        // Test on_event
+        let data = json!({"key": "value"});
+        plugin.on_event(&EventType::RunnerOnOk, Some(&data));
+    }
+}
