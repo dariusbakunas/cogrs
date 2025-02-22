@@ -5,6 +5,7 @@ members = [
     "cogrs",
     "cogrs-plugins",
     "cogrs-core",
+    "cogrs-schema",
     "cogrs-modules",
     "modules/command",
     "plugins/callback/minimal",

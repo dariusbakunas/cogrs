@@ -17,7 +17,6 @@ macro_rules! define_module {
             use anyhow::{anyhow, Result};
             use serde_json::Value;
             use $crate::cli::ModuleArgs;
-            use $crate::validation::validate_input;
 
             let args = ModuleArgs::parse();
 
