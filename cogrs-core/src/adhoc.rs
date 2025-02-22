@@ -37,6 +37,7 @@ impl AdHoc {
 
         let task = TaskBuilder::new(
             "AdHoc",
+            &options.connection,
             Action::Module(module_name.to_string(), module_args),
         )
         .poll_interval(options.poll_interval)

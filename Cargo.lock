@@ -353,6 +353,7 @@ name = "cogrs-plugins"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "indexmap",
  "libloading",
  "once_cell",
  "serde_json",
@@ -1664,6 +1665,15 @@ name = "spin"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
+
+[[package]]
+name = "ssh"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cogrs-plugins",
+ "serde_json",
+]
 
 [[package]]
 name = "stable_deref_trait"

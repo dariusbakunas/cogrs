@@ -22,6 +22,7 @@ pub struct Task {
     implicit: bool,
     throttle: usize,
     run_once: bool,
+    connection: String,
 }
 
 // TODO: add task builder
@@ -35,6 +36,7 @@ impl Task {
         async_val: Option<u64>,
         implicit: bool,
         tags: Vec<String>,
+        connection: String,
     ) -> Self {
         Self {
             name,
@@ -47,11 +49,16 @@ impl Task {
             tags,
             throttle: 0, // TODO: where do we  get throttle
             run_once: false,
+            connection,
         }
     }
 
     pub fn uuid(&self) -> &str {
         &self.uuid
+    }
+
+    pub fn connection(&self) -> &str {
+        &self.connection
     }
 
     pub fn action(&self) -> &Action {
@@ -107,10 +114,11 @@ pub struct TaskBuilder {
     async_val: Option<u64>,
     implicit: bool,
     tags: Vec<String>,
+    connection: String,
 }
 
 impl TaskBuilder {
-    pub fn new(name: &str, action: Action) -> TaskBuilder {
+    pub fn new(name: &str, connection: &str, action: Action) -> TaskBuilder {
         TaskBuilder {
             name: name.to_string(),
             action,
@@ -119,6 +127,7 @@ impl TaskBuilder {
             async_val: None,
             implicit: false,
             tags: Vec::new(),
+            connection: connection.to_string(),
         }
     }
 
@@ -156,6 +165,7 @@ impl TaskBuilder {
             self.async_val,
             self.implicit,
             self.tags,
+            self.connection,
         )
     }
 }

@@ -41,8 +41,11 @@ impl PlayIterator {
         let batch = inventory_manager.filter_hosts(self.play.pattern(), None)?;
         self.batch_size = batch.len() as u32;
 
-        let mut setup_task_builder =
-            TaskBuilder::new("Gathering Facts", Action::Meta("gather_facts".to_string()));
+        let mut setup_task_builder = TaskBuilder::new(
+            "Gathering Facts",
+            self.play.connection(),
+            Action::Meta("gather_facts".to_string()),
+        );
 
         // Unless play is specifically tagged, gathering should 'always' run
         if self.play.tags().is_empty() {

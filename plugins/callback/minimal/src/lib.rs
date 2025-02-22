@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 create_callback_plugin!(
     MinimalStdOut,
+    "minimal",
     [
         EventType::RunnerOnOk,
         EventType::RunnerOnFailed,

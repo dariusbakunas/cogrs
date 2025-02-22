@@ -25,7 +25,7 @@ pub trait CallbackPlugin: Send + Sync {
 #[macro_export]
 macro_rules! create_callback_plugin {
     // Macro expects the plugin name, events it handles, and methods to implement
-    ($plugin_name:ident, [$($event:expr),*], $handler:expr) => {
+    ($plugin_name:ident, $plugin_name_str: expr, [$($event:expr),*], $handler:expr) => {
         pub struct $plugin_name;
 
         impl CallbackPlugin for $plugin_name {
@@ -51,6 +51,11 @@ macro_rules! create_callback_plugin {
         #[no_mangle]
         pub extern "C" fn plugin_type() -> u64 {
             PluginType::Callback.id()
+        }
+
+        #[no_mangle]
+        pub extern "C" fn plugin_name() -> *const u8 {
+            $plugin_name_str.as_ptr()
         }
     };
 }

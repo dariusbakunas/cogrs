@@ -189,13 +189,18 @@ impl<'a> LinearStrategy<'a> {
                     .get_host(&host)
                     .ok_or(anyhow!("Host not found: {}", host))?;
 
-                let task_vars = self.variable_manager.get_vars(
+                let mut task_vars = self.variable_manager.get_vars(
                     Some(iterator.play()),
                     Some(host),
                     Some(&task),
                     Some(self.inventory_manager),
                     true,
                     true,
+                );
+
+                task_vars.insert(
+                    String::from("remote_addr"),
+                    Variable::String(host.address().to_string()),
                 );
 
                 if let Action::Meta(action) = task.action() {

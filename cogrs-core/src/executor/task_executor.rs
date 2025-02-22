@@ -28,10 +28,15 @@ impl TaskExecutor {
             task.uuid(),
             host.name()
         );
+
+        // TODO: handle conditionals
+
         let result = TaskResult::new(host.name(), task.uuid());
         // TODO: handle with_*
         // TODO: get connection plugin
 
         Ok(result)
     }
+
+    fn get_connection(current_connection: &str) {}
 }

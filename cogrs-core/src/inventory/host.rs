@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 #[derive(Clone, Debug)]
 pub struct Host {
     name: String,
+    address: String,
     implicit: bool,
     vars: IndexMap<String, Variable>,
     groups: Vec<String>,
@@ -13,6 +14,7 @@ impl Host {
     pub fn new(name: &str) -> Self {
         Host {
             name: name.to_string(),
+            address: name.to_string(),
             groups: Vec::new(),
             vars: IndexMap::new(),
             implicit: false,
@@ -25,6 +27,10 @@ impl Host {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn address(&self) -> &str {
+        &self.address
     }
 
     pub fn set_vars(&mut self, vars: IndexMap<String, Variable>) {
