@@ -1,3 +1,4 @@
+use crate::config::manager::ConfigManager;
 use crate::executor::task_queue_manager::TaskQueueManager;
 use crate::inventory::manager::InventoryManager;
 use crate::playbook::play::Play;
@@ -34,6 +35,9 @@ impl AdHoc {
             "Running adhoc module {} with args {:?}",
             module_name, module_args
         );
+
+        let config_manager = ConfigManager::instance();
+        config_manager.lock().await.init()?;
 
         let task = TaskBuilder::new(
             "AdHoc",

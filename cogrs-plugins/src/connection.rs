@@ -1,5 +1,4 @@
 use anyhow::Result;
-use indexmap::IndexMap;
 
 pub trait ConnectionPlugin: Send + Sync {
     /// Checks if the plugin is currently connected.
