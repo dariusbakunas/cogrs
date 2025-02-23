@@ -247,7 +247,7 @@ impl<'a> LinearStrategy<'a> {
 
         let new_worker = tokio::spawn(async move {
             let executor = TaskExecutor::new();
-            let result = executor.run(&host, &task, task_vars, &sender);
+            let result = executor.run(&host, &task, task_vars, &sender).await;
         });
         self.tqm.set_worker(worker_index, new_worker);
         Ok(())

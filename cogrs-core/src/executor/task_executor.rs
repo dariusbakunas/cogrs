@@ -16,7 +16,7 @@ impl TaskExecutor {
         Self {}
     }
 
-    pub fn run(
+    pub async fn run(
         &self,
         host: &Host,
         task: &Task,
@@ -34,6 +34,10 @@ impl TaskExecutor {
         let result = TaskResult::new(host.name(), task.uuid());
         // TODO: handle with_*
         // TODO: get connection plugin
+        let plugin_loader = cogrs_plugins::plugin_loader::PluginLoader::instance();
+        let loader = plugin_loader.lock().await;
+
+        let connection_plugin = loader.get_connection_plugin(task.connection()).await?;
 
         Ok(result)
     }

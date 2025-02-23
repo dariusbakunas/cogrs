@@ -1,10 +1,12 @@
 use crate::callback::CallbackPlugin;
+use crate::connection::ConnectionPlugin;
 use crate::plugin_type::PluginType;
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use libloading::{Library, Symbol};
 use log::warn;
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
+use std::ffi::{c_char, CStr};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -83,6 +85,88 @@ impl PluginLoader {
         }
     }
 
+    async fn read_plugin_directory(&self, path: &Path) -> Result<Vec<fs::DirEntry>> {
+        fs::read_dir(path)
+            .with_context(|| format!("Failed to read directory {:?}", path))
+            .map(|entries| entries.filter_map(Result::ok).collect())
+    }
+
+    async fn get_plugin_path(&self, entry: &fs::DirEntry, base_path: &Path) -> Result<PathBuf> {
+        entry
+            .path()
+            .canonicalize()
+            .with_context(|| format!("Failed to get canonical path for entry in {:?}", base_path))
+    }
+
+    pub async fn get_connection_plugin(&self, name: &str) -> Result<Arc<dyn ConnectionPlugin>> {
+        let plugin_extension = Self::get_plugin_extension();
+
+        if let Some(paths) = self.plugin_paths.get(&PluginType::Connection) {
+            for path in paths {
+                let entries = match self.read_plugin_directory(path).await {
+                    Ok(entries) => entries,
+                    Err(e) => {
+                        warn!("Failed to read plugin directory {:?}: {}", path, e);
+                        continue;
+                    }
+                };
+
+                for entry in entries {
+                    let plugin_path = match self.get_plugin_path(&entry, path).await {
+                        Ok(path) => path,
+                        Err(e) => {
+                            warn!("Skipping invalid directory entry in {:?}: {}", path, e);
+                            continue;
+                        }
+                    };
+
+                    if self.is_valid_plugin_file(&plugin_path, &plugin_extension) {
+                        if let Some(plugin) =
+                            unsafe { self.load_connection_plugin(&plugin_path, name)? }
+                        {
+                            return Ok(plugin);
+                        }
+                    }
+                }
+            }
+        }
+
+        bail!("Connection plugin {} not found", name);
+    }
+
+    unsafe fn load_connection_plugin(
+        &self,
+        path: &Path,
+        name: &str,
+    ) -> Result<Option<Arc<dyn ConnectionPlugin>>> {
+        let lib = Library::new(path).with_context(|| "Failed to load plugin")?;
+        let plugin_type_value = self.get_plugin_type(&lib)?;
+        match PluginType::from_u64(plugin_type_value) {
+            Some(PluginType::Connection) => {
+                let plugin_name_fn: Symbol<fn() -> *const c_char> = lib.get(b"plugin_name")?;
+                let plugin_name = CStr::from_ptr(plugin_name_fn()).to_str()?;
+
+                if plugin_name.eq(name) {
+                    let create_plugin_fn: Symbol<fn() -> Arc<dyn ConnectionPlugin>> =
+                        lib.get(b"create_plugin").with_context(|| {
+                            format!("Missing `create_plugin` function in plugin at {:?}", path)
+                        })?;
+                    return Ok(Some(create_plugin_fn()));
+                } else {
+                    warn!(
+                        "Skipping connection plugin at {:?}, name {} does not match {}",
+                        path, plugin_name, name
+                    );
+                }
+            }
+            _ => {
+                warn!("Skipping non-connection plugin at {:?}", path);
+            }
+        }
+
+        Ok(None)
+    }
+
     pub async fn get_callback_plugins(&self) -> Result<Vec<Arc<dyn CallbackPlugin>>> {
         if let Some(cached) = self.get_cached_callback_plugins().await {
             return Ok(cached);
@@ -93,21 +177,25 @@ impl PluginLoader {
 
         if let Some(paths) = self.plugin_paths.get(&PluginType::Callback) {
             for path in paths {
-                let entries = match fs::read_dir(path) {
+                let entries = match self.read_plugin_directory(path).await {
                     Ok(entries) => entries,
                     Err(e) => {
                         warn!("Failed to read plugin directory {:?}: {}", path, e);
-                        continue; // Skip this path
+                        continue;
                     }
                 };
 
                 for entry in entries {
-                    let path = entry
-                        .with_context(|| format!("Failed to read directory entry in {:?}", path))?
-                        .path();
-                    if self.is_valid_plugin_file(&path, &plugin_extension) {
+                    let plugin_path = match self.get_plugin_path(&entry, path).await {
+                        Ok(path) => path,
+                        Err(e) => {
+                            warn!("Skipping invalid directory entry in {:?}: {}", path, e);
+                            continue;
+                        }
+                    };
+                    if self.is_valid_plugin_file(&plugin_path, &plugin_extension) {
                         // Load the plugin and register it if valid
-                        if let Some(plugin) = unsafe { self.load_callback_plugin(&path) }? {
+                        if let Some(plugin) = unsafe { self.load_callback_plugin(&plugin_path) }? {
                             plugins.push(plugin);
                         }
                     }

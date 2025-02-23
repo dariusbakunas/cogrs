@@ -353,6 +353,7 @@ name = "cogrs-plugins"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cogrs-schema",
  "indexmap",
  "libloading",
  "log",

@@ -3,7 +3,6 @@ use clap::Parser;
 use cogrs_modules::define_module;
 use cogrs_modules::framework::Module;
 use cogrs_schema::define_schema;
-use cogrs_schema::validation::validate_input;
 
 define_schema! {
     r#"

@@ -1,4 +1,6 @@
 use anyhow::Result;
+use cogrs_schema::validation::validate_input;
+use serde_json::Value;
 
 pub trait ConnectionPlugin: Send + Sync {
     /// Checks if the plugin is currently connected.
@@ -24,6 +26,12 @@ pub trait ConnectionPlugin: Send + Sync {
 
     /// Initializes the plugin with a set of parameters.
     fn initialize(&mut self, parameters: &str) -> Result<()>;
+
+    fn validate_parameters(&self, parameters: &str) -> Result<()> {
+        validate_input(self.schema(), &Value::String(parameters.to_string()))
+    }
+
+    fn schema(&self) -> &'static str;
 }
 
 #[macro_export]
@@ -49,8 +57,9 @@ macro_rules! create_connection_plugin {
         }
 
         #[no_mangle]
-        pub extern "C" fn plugin_name() -> *const u8 {
-            $plugin_name_str.as_ptr()
+        pub extern "C" fn plugin_name() -> *const std::os::raw::c_char {
+            // Ensure the string is null-terminated explicitly
+            concat!($plugin_name_str, "\0").as_ptr() as *const std::os::raw::c_char
         }
     };
 }

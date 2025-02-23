@@ -53,6 +53,12 @@ impl ConnectionPlugin for Ssh {
     }
 
     fn initialize(&mut self, parameters: &str) -> Result<()> {
-        todo!()
+        self.validate_parameters(parameters)?;
+
+        Ok(())
+    }
+
+    fn schema(&self) -> &'static str {
+        SCHEMA
     }
 }
