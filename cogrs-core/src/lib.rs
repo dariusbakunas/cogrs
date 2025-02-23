@@ -1,4 +1,5 @@
 pub mod adhoc;
+mod cli;
 pub mod config;
 pub mod constants;
 pub mod executor;
