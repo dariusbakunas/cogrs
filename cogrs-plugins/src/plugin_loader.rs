@@ -4,12 +4,14 @@ use anyhow::{Context, Result};
 use libloading::{Library, Symbol};
 use log::warn;
 use once_cell::sync::Lazy;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 pub struct PluginLoader {
+    plugin_paths: HashMap<PluginType, Vec<PathBuf>>,
     cached_callback_plugins: Mutex<Option<Vec<Arc<dyn CallbackPlugin>>>>,
 }
 
@@ -17,7 +19,12 @@ impl PluginLoader {
     fn new() -> Self {
         PluginLoader {
             cached_callback_plugins: Mutex::new(None),
+            plugin_paths: HashMap::new(),
         }
+    }
+
+    pub fn set_plugin_paths(&mut self, plugin_paths: HashMap<PluginType, Vec<PathBuf>>) {
+        self.plugin_paths = plugin_paths;
     }
 
     /// Determines the platform-specific plugin file extension
@@ -76,10 +83,7 @@ impl PluginLoader {
         }
     }
 
-    pub async fn get_callback_plugins(
-        &self,
-        paths: &[PathBuf],
-    ) -> Result<Vec<Arc<dyn CallbackPlugin>>> {
+    pub async fn get_callback_plugins(&self) -> Result<Vec<Arc<dyn CallbackPlugin>>> {
         if let Some(cached) = self.get_cached_callback_plugins().await {
             return Ok(cached);
         }
@@ -87,26 +91,31 @@ impl PluginLoader {
         let mut plugins: Vec<Arc<dyn CallbackPlugin>> = Vec::new();
         let plugin_extension = Self::get_plugin_extension();
 
-        for path in paths {
-            let entries = match fs::read_dir(path) {
-                Ok(entries) => entries,
-                Err(e) => {
-                    warn!("Failed to read plugin directory {:?}: {}", path, e);
-                    continue; // Skip this path
-                }
-            };
+        if let Some(paths) = self.plugin_paths.get(&PluginType::Callback) {
+            for path in paths {
+                let entries = match fs::read_dir(path) {
+                    Ok(entries) => entries,
+                    Err(e) => {
+                        warn!("Failed to read plugin directory {:?}: {}", path, e);
+                        continue; // Skip this path
+                    }
+                };
 
-            for entry in entries {
-                let path = entry
-                    .with_context(|| format!("Failed to read directory entry in {:?}", path))?
-                    .path();
-                if self.is_valid_plugin_file(&path, &plugin_extension) {
-                    // Load the plugin and register it if valid
-                    if let Some(plugin) = unsafe { self.load_callback_plugin(&path) }? {
-                        plugins.push(plugin);
+                for entry in entries {
+                    let path = entry
+                        .with_context(|| format!("Failed to read directory entry in {:?}", path))?
+                        .path();
+                    if self.is_valid_plugin_file(&path, &plugin_extension) {
+                        // Load the plugin and register it if valid
+                        if let Some(plugin) = unsafe { self.load_callback_plugin(&path) }? {
+                            plugins.push(plugin);
+                        }
                     }
                 }
             }
+        } else {
+            warn!("No callback plugin paths configured, no callback plugins will be loaded.");
+            return Ok(plugins);
         }
 
         self.cache_callback_plugins(plugins.clone()).await;

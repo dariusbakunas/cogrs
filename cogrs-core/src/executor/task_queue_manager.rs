@@ -20,13 +20,12 @@ pub struct TaskQueueManager {
     terminated: bool,
     unreachable_hosts: HashMap<String, Host>,
     workers: Vec<tokio::task::JoinHandle<()>>,
-    callback_plugin_paths: Vec<PathBuf>,
 }
 
 const DEFAULT_FORKS: usize = 5;
 
 impl TaskQueueManager {
-    pub fn new(forks: Option<usize>, callback_plugin_paths: &[PathBuf]) -> Self {
+    pub fn new(forks: Option<usize>) -> Self {
         Self {
             callbacks: HashMap::new(),
             callbacks_loaded: false,
@@ -34,7 +33,6 @@ impl TaskQueueManager {
             terminated: false,
             unreachable_hosts: HashMap::new(),
             workers: Vec::with_capacity(forks.unwrap_or(DEFAULT_FORKS)),
-            callback_plugin_paths: callback_plugin_paths.to_owned(),
         }
     }
 
@@ -103,9 +101,7 @@ impl TaskQueueManager {
         let plugin_loader = cogrs_plugins::plugin_loader::PluginLoader::instance();
         let loader = plugin_loader.lock().await;
 
-        let plugins = loader
-            .get_callback_plugins(&self.callback_plugin_paths)
-            .await?;
+        let plugins = loader.get_callback_plugins().await?;
 
         for plugin in plugins {
             self.register_callback(plugin);

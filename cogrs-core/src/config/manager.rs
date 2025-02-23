@@ -30,25 +30,24 @@ impl ConfigManager {
     }
 
     pub fn init(&mut self) -> Result<()> {
-        let config_map = self.read_config_yaml_file()?;
+        self.base_defs = self.read_config_yaml_file()?;
         let env = Environment::new();
         let template_context = self.load_template_context();
-        let rendered_config = self.render_with_jinja(config_map, &env, &template_context)?;
-        self.base_defs.extend(rendered_config);
+        let rendered_config = self.render_with_jinja(&env, &template_context)?;
+        self.base_defs = rendered_config;
         Ok(())
     }
 
     fn render_with_jinja(
         &self,
-        config_map: IndexMap<String, Value>,
         env: &Environment,
         context_data: &std::collections::HashMap<String, String>,
     ) -> Result<IndexMap<String, Value>> {
         let mut rendered_map = IndexMap::new();
 
-        for (key, value) in config_map {
+        for (key, value) in self.base_defs.iter() {
             let rendered_value = self.recursively_render_value(&value, env, context_data)?;
-            rendered_map.insert(key, rendered_value);
+            rendered_map.insert(key.clone(), rendered_value);
         }
 
         Ok(rendered_map)
@@ -432,9 +431,7 @@ mod tests {
 
         let env = Environment::new();
         let template_context = manager.load_template_context();
-        let rendered_config = manager
-            .render_with_jinja(manager.base_defs.clone(), &env, &template_context)
-            .unwrap();
+        let rendered_config = manager.render_with_jinja(&env, &template_context).unwrap();
         manager.base_defs = rendered_config;
 
         let (key1, _) = manager.get_config_value::<String>("key1").unwrap().unwrap();
