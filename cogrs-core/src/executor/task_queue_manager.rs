@@ -10,6 +10,7 @@ use cogrs_plugins::callback::{CallbackPlugin, EventType};
 use serde_json::Value;
 use std::cmp::min;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 pub struct TaskQueueManager {
@@ -19,12 +20,13 @@ pub struct TaskQueueManager {
     terminated: bool,
     unreachable_hosts: HashMap<String, Host>,
     workers: Vec<tokio::task::JoinHandle<()>>,
+    callback_plugin_path: PathBuf,
 }
 
 const DEFAULT_FORKS: usize = 5;
 
 impl TaskQueueManager {
-    pub fn new(forks: Option<usize>) -> Self {
+    pub fn new(forks: Option<usize>, callback_plugin_path: &PathBuf) -> Self {
         Self {
             callbacks: HashMap::new(),
             callbacks_loaded: false,
@@ -32,6 +34,7 @@ impl TaskQueueManager {
             terminated: false,
             unreachable_hosts: HashMap::new(),
             workers: Vec::with_capacity(forks.unwrap_or(DEFAULT_FORKS)),
+            callback_plugin_path: callback_plugin_path.to_path_buf(),
         }
     }
 
@@ -100,7 +103,9 @@ impl TaskQueueManager {
         let plugin_loader = cogrs_plugins::plugin_loader::PluginLoader::instance();
         let loader = plugin_loader.lock().await;
 
-        let plugins = loader.get_callback_plugins().await?;
+        let plugins = loader
+            .get_callback_plugins(&self.callback_plugin_path)
+            .await?;
         for plugin in plugins {
             self.register_callback(plugin);
         }

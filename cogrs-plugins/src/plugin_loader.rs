@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use libloading::{Library, Symbol};
 use once_cell::sync::Lazy;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -75,19 +75,18 @@ impl PluginLoader {
         }
     }
 
-    pub async fn get_callback_plugins(&self) -> Result<Vec<Arc<dyn CallbackPlugin>>> {
+    pub async fn get_callback_plugins(
+        &self,
+        path: &PathBuf,
+    ) -> Result<Vec<Arc<dyn CallbackPlugin>>> {
         if let Some(cached) = self.get_cached_callback_plugins().await {
             return Ok(cached);
         }
 
         let mut plugins: Vec<Arc<dyn CallbackPlugin>> = Vec::new();
-        // TODO: make this configurable
-        let plugin_dir = "/Users/darius/Programming/cogrs/dist/minimal-apple_x86_64-apple-darwin";
-
         let plugin_extension = Self::get_plugin_extension();
 
-        let entries =
-            fs::read_dir(plugin_dir).with_context(|| "Failed to read plugin directory")?;
+        let entries = fs::read_dir(path).with_context(|| "Failed to read plugin directory")?;
 
         for entry in entries {
             let path = entry
