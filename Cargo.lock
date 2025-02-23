@@ -1682,6 +1682,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cogrs-plugins",
+ "cogrs-schema",
  "serde_json",
 ]
 

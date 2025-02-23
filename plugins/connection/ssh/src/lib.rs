@@ -2,7 +2,22 @@ use anyhow::Result;
 use cogrs_plugins::connection::ConnectionPlugin;
 use cogrs_plugins::create_connection_plugin;
 use cogrs_plugins::plugin_type::PluginType;
-use serde_json::json;
+use cogrs_schema::define_schema;
+
+define_schema! {
+    r#"
+    {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "SSH Connection Plugin",
+        "type": "object",
+        "properties": {
+            "host": { "type": "string", "description": "Hostname/IP to connect to." }
+        },
+        "additionalProperties": true,
+        "required": ["host"]
+    }
+    "#
+}
 
 create_connection_plugin!(Ssh, "ssh");
 
