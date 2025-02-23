@@ -5,8 +5,10 @@ use crate::playbook::play::Play;
 use crate::playbook::task::{Action, TaskBuilder};
 use crate::playbook::Playbook;
 use crate::vars::manager::VariableManager;
-use anyhow::Result;
+use crate::vars::variable::Variable::Path;
+use anyhow::{anyhow, Result};
 use log::info;
+use std::fs;
 use std::path::PathBuf;
 
 pub struct AdHoc;
@@ -38,6 +40,16 @@ impl AdHoc {
 
         let config_manager = ConfigManager::instance();
         config_manager.lock().await.init()?;
+        let cogrs_home = config_manager
+            .lock()
+            .await
+            .get_config_value::<PathBuf>("COGRS_HOME")?;
+        let (cogrs_home, _) = cogrs_home
+            .ok_or_else(|| anyhow!("`COGRS_HOME` is not defined in the configuration"))?;
+
+        if !cogrs_home.exists() {
+            fs::create_dir_all(&cogrs_home)?;
+        }
 
         let task = TaskBuilder::new(
             "AdHoc",

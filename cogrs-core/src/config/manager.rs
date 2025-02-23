@@ -5,6 +5,7 @@ use minijinja::Environment;
 use once_cell::sync::Lazy;
 use serde::de::DeserializeOwned;
 use serde_yaml::Value;
+use std::path::PathBuf;
 use tokio::sync::Mutex;
 
 pub struct ConfigManager {
@@ -196,6 +197,23 @@ fn parse_config_value<T: DeserializeOwned>(
     origin: ConfigOrigin,
     key: &str,
 ) -> Result<Option<(T, ConfigOrigin)>> {
+    if let Ok(_) = serde_yaml::from_value::<PathBuf>(value.clone()) {
+        // TODO: this will probably need to handle multiple paths separated by colon
+        if let Value::String(path_str) = &value {
+            if path_str.starts_with('~') {
+                if let Some(home_dir) = dirs::home_dir() {
+                    let expanded_path = path_str.replacen("~", home_dir.to_str().unwrap(), 1);
+                    return Ok(Some((
+                        serde_yaml::from_value::<T>(Value::String(expanded_path))?, // Deserialize expanded PathBuf
+                        origin,
+                    )));
+                } else {
+                    bail!("Failed to expand '~/': Home directory could not be determined.");
+                }
+            }
+        }
+    }
+
     match serde_yaml::from_value::<T>(value) {
         Ok(deserialized_value) => Ok(Some((deserialized_value, origin))),
         Err(err) => bail!(
