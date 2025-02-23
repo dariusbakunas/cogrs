@@ -9,10 +9,19 @@ COGRS_HOME:
     - key: home
       section: defaults
   type: path
+DEFAULT_CALLBACK_PLUGIN_PATH:
+  name: Callback Plugins Path
+  default: '{{ COGRS_HOME ~ "/plugins/callback:/usr/share/cogrs/plugins/callback" }}'
+  description: Colon-separated paths in which CogRS will search for Callback Plugins.
+  env: [{name: COGRS_CALLBACK_PLUGINS}]
+  ini:
+    - {key: callback_plugins, section: defaults}
+  type: path
+  yaml: {key: plugins.callback.path}
 DEFAULT_CONNECTION_PLUGIN_PATH:
   name: Connection Plugins Path
   default: '{{ COGRS_HOME ~ "/plugins/connection:/usr/share/cogrs/plugins/connection" }}'
-  description: Colon-separated paths in which Cogrs will search for Connection Plugins.
+  description: Colon-separated paths in which CogRS will search for Connection Plugins.
   env: [{name: COGRS_CONNECTION_PLUGINS}]
   ini:
     - {key: connection_plugins, section: defaults}

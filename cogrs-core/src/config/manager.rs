@@ -173,6 +173,10 @@ impl ConfigManager {
                                 Value::String(env_value),
                                 ConfigOrigin::Env,
                                 key,
+                                item_map
+                                    .get("type")
+                                    .filter(|v| v.is_string())
+                                    .and_then(|v| v.as_str().map(|s| s.to_string())),
                             );
                         }
                     }
@@ -182,7 +186,15 @@ impl ConfigManager {
 
         // Fall back to the "default" value
         if let Some(default_value) = mapping.get("default") {
-            return parse_config_value::<T>(default_value.clone(), ConfigOrigin::Default, key);
+            return parse_config_value::<T>(
+                default_value.clone(),
+                ConfigOrigin::Default,
+                key,
+                mapping
+                    .get("type")
+                    .filter(|v| v.is_string())
+                    .and_then(|v| v.as_str().map(|s| s.to_string())),
+            );
         }
 
         // If no valid value is found
@@ -196,21 +208,32 @@ fn parse_config_value<T: DeserializeOwned>(
     value: Value,
     origin: ConfigOrigin,
     key: &str,
+    value_type: Option<String>,
 ) -> Result<Option<(T, ConfigOrigin)>> {
-    if let Ok(_) = serde_yaml::from_value::<PathBuf>(value.clone()) {
-        // TODO: this will probably need to handle multiple paths separated by colon
+    if value_type.as_deref() == Some("path") {
         if let Value::String(path_str) = &value {
-            if path_str.starts_with('~') {
-                if let Some(home_dir) = dirs::home_dir() {
-                    let expanded_path = path_str.replacen("~", home_dir.to_str().unwrap(), 1);
-                    return Ok(Some((
-                        serde_yaml::from_value::<T>(Value::String(expanded_path))?, // Deserialize expanded PathBuf
-                        origin,
-                    )));
-                } else {
-                    bail!("Failed to expand '~/': Home directory could not be determined.");
-                }
-            }
+            let expanded_paths: Result<Vec<String>> = path_str
+                .split(':') // Split paths by colon
+                .map(|path| {
+                    if path.starts_with('~') {
+                        // Expand '~' to the user's home directory
+                        if let Some(home_dir) = dirs::home_dir() {
+                            Ok(path.replacen('~', home_dir.to_str().unwrap_or_default(), 1))
+                        } else {
+                            bail!("Failed to expand '~/': Home directory could not be determined.");
+                        }
+                    } else {
+                        Ok(path.to_string()) // Path does not start with '~', leave it as is
+                    }
+                })
+                .collect();
+
+            // Join expanded paths back into a colon-separated string
+            let expanded_path_str = expanded_paths?.join(":");
+            return Ok(Some((
+                serde_yaml::from_value::<T>(Value::String(expanded_path_str))?, // Deserialize expanded PathBuf
+                origin,
+            )));
         }
     }
 

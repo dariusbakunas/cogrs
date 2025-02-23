@@ -40,11 +40,10 @@ impl AdHoc {
 
         let config_manager = ConfigManager::instance();
         config_manager.lock().await.init()?;
-        let cogrs_home = config_manager
+        let (cogrs_home, _) = config_manager
             .lock()
             .await
-            .get_config_value::<PathBuf>("COGRS_HOME")?;
-        let (cogrs_home, _) = cogrs_home
+            .get_config_value::<PathBuf>("COGRS_HOME")?
             .ok_or_else(|| anyhow!("`COGRS_HOME` is not defined in the configuration"))?;
 
         if !cogrs_home.exists() {
