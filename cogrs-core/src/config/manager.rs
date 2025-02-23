@@ -173,7 +173,7 @@ impl ConfigManager {
                                 Value::String(env_value),
                                 ConfigOrigin::Env,
                                 key,
-                                item_map
+                                mapping
                                     .get("type")
                                     .filter(|v| v.is_string())
                                     .and_then(|v| v.as_str().map(|s| s.to_string())),

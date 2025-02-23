@@ -50,13 +50,19 @@ impl AdHoc {
             fs::create_dir_all(&cogrs_home)?;
         }
 
-        let (callback_plugin_path, _) = config_manager
+        let (callback_plugin_path_cfg, _) = config_manager
             .lock()
             .await
             .get_config_value::<PathBuf>("DEFAULT_CALLBACK_PLUGIN_PATH")?
             .ok_or_else(|| {
                 anyhow!("`DEFAULT_CALLBACK_PLUGIN_PATH` is not defined in the configuration")
             })?;
+
+        let callback_plugin_paths: Vec<PathBuf> = callback_plugin_path_cfg
+            .to_string_lossy()
+            .split(':')
+            .map(|path| PathBuf::from(path))
+            .collect();
 
         let task = TaskBuilder::new(
             "AdHoc",
@@ -83,7 +89,7 @@ impl AdHoc {
 
         let _playbook = Playbook::new("__adhoc_playbook__", &[play.clone()]);
 
-        let mut tqm = TaskQueueManager::new(Some(options.forks as usize), &callback_plugin_path);
+        let mut tqm = TaskQueueManager::new(Some(options.forks as usize), &callback_plugin_paths);
         tqm.run(play, &variable_manager, inventory_manager).await?;
 
         Ok(())

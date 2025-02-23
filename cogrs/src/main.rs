@@ -3,6 +3,7 @@ use clap::Parser;
 use cogrs::cli::Cli;
 use cogrs_core::adhoc::{AdHoc, AdHocOptions};
 use cogrs_core::inventory::manager;
+use log::error;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -42,7 +43,7 @@ async fn run() -> Result<()> {
             private_key_file: cli.private_key_file,
         };
 
-        AdHoc::run(
+        let result = AdHoc::run(
             pattern,
             cli.limit.as_deref(),
             &module_name,
@@ -50,7 +51,14 @@ async fn run() -> Result<()> {
             &manager,
             &options,
         )
-        .await?;
+        .await;
+
+        match result {
+            Ok(_) => {}
+            Err(err) => {
+                error!("AdHoc run error: {:?}", err);
+            }
+        }
     } else {
         todo!()
     }

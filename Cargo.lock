@@ -321,7 +321,6 @@ dependencies = [
  "dirs",
  "hmac",
  "indexmap",
- "libloading",
  "log",
  "mac_address",
  "minijinja",
@@ -356,6 +355,7 @@ dependencies = [
  "anyhow",
  "indexmap",
  "libloading",
+ "log",
  "once_cell",
  "serde_json",
  "tokio",
@@ -1080,9 +1080,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.25"
+version = "0.4.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04cbf5b083de1c7e0222a7a51dbfdba1cbe1c6ab0b15e29fff3f6c077fd9cd9f"
+checksum = "30bde2b3dc3671ae49d8e2e9f044c7c005836e7a023ee57cffa25ab82764bb9e"
 
 [[package]]
 name = "mac_address"

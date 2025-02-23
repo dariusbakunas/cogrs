@@ -2,6 +2,7 @@ use crate::callback::CallbackPlugin;
 use crate::plugin_type::PluginType;
 use anyhow::{Context, Result};
 use libloading::{Library, Symbol};
+use log::warn;
 use once_cell::sync::Lazy;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -69,7 +70,7 @@ impl PluginLoader {
                 Ok(Some(plugin))
             }
             _ => {
-                println!("Skipping unsupported plugin type at {:?}", path);
+                warn!("Skipping non-callback plugin at {:?}", path);
                 Ok(None)
             }
         }
@@ -77,7 +78,7 @@ impl PluginLoader {
 
     pub async fn get_callback_plugins(
         &self,
-        path: &PathBuf,
+        paths: &[PathBuf],
     ) -> Result<Vec<Arc<dyn CallbackPlugin>>> {
         if let Some(cached) = self.get_cached_callback_plugins().await {
             return Ok(cached);
@@ -86,16 +87,24 @@ impl PluginLoader {
         let mut plugins: Vec<Arc<dyn CallbackPlugin>> = Vec::new();
         let plugin_extension = Self::get_plugin_extension();
 
-        let entries = fs::read_dir(path).with_context(|| "Failed to read plugin directory")?;
+        for path in paths {
+            let entries = match fs::read_dir(path) {
+                Ok(entries) => entries,
+                Err(e) => {
+                    warn!("Failed to read plugin directory {:?}: {}", path, e);
+                    continue; // Skip this path
+                }
+            };
 
-        for entry in entries {
-            let path = entry
-                .with_context(|| "Failed to read directory entry")?
-                .path();
-            if self.is_valid_plugin_file(&path, &plugin_extension) {
-                // Load the plugin and register it if valid
-                if let Some(plugin) = unsafe { self.load_callback_plugin(&path) }? {
-                    plugins.push(plugin);
+            for entry in entries {
+                let path = entry
+                    .with_context(|| format!("Failed to read directory entry in {:?}", path))?
+                    .path();
+                if self.is_valid_plugin_file(&path, &plugin_extension) {
+                    // Load the plugin and register it if valid
+                    if let Some(plugin) = unsafe { self.load_callback_plugin(&path) }? {
+                        plugins.push(plugin);
+                    }
                 }
             }
         }
