@@ -13,7 +13,7 @@ use crate::vars::variable::Variable;
 use anyhow::{anyhow, bail, Result};
 use cogrs_plugins::callback::EventType;
 use indexmap::IndexMap;
-use log::{debug, warn};
+use log::{debug, error, warn};
 use std::collections::{HashMap, HashSet};
 use tokio::sync::mpsc;
 use tokio::time::{self, Duration};
@@ -248,6 +248,13 @@ impl<'a> LinearStrategy<'a> {
         let new_worker = tokio::spawn(async move {
             let executor = TaskExecutor::new();
             let result = executor.run(&host, &task, task_vars, &sender).await;
+
+            match result {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("Error running task: {}", e);
+                }
+            }
         });
         self.tqm.set_worker(worker_index, new_worker);
         Ok(())

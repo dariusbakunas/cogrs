@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use cogrs_schema::validation::validate_input;
 use serde_json::Value;
 
@@ -28,7 +28,10 @@ pub trait ConnectionPlugin: Send + Sync {
     fn initialize(&mut self, parameters: &str) -> Result<()>;
 
     fn validate_parameters(&self, parameters: &str) -> Result<()> {
-        validate_input(self.schema(), &Value::String(parameters.to_string()))
+        let parsed_params: Value = serde_json::from_str(parameters)
+            .context("Failed to parse parameters into JSON value")?;
+        validate_input(self.schema(), &parsed_params)
+            .context("Failed to validate connection plugin parameters")
     }
 
     fn schema(&self) -> &'static str;
@@ -38,7 +41,6 @@ pub trait ConnectionPlugin: Send + Sync {
 macro_rules! create_connection_plugin {
     ($plugin_name:ident, $plugin_name_str: expr) => {
         pub struct $plugin_name;
-        use std::sync::Arc;
 
         impl Default for $plugin_name {
             fn default() -> Self {
@@ -47,8 +49,8 @@ macro_rules! create_connection_plugin {
         }
 
         #[no_mangle]
-        pub fn create_plugin() -> Arc<dyn ConnectionPlugin> {
-            Arc::new($plugin_name)
+        pub fn create_plugin() -> Box<dyn ConnectionPlugin> {
+            Box::new($plugin_name)
         }
 
         #[no_mangle]

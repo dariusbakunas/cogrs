@@ -1,12 +1,14 @@
 use anyhow::bail;
 use anyhow::Result;
 use indexmap::IndexMap;
+use serde::Serialize;
 use serde_yaml::Value;
 use std::path::{Path, PathBuf};
 
 pub type Sequence = Vec<Variable>;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
+#[serde(untagged)]
 pub enum Number {
     Int(i64),
     Float(f64),
@@ -21,7 +23,7 @@ impl Number {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct Mapping {
     pub(crate) map: IndexMap<String, Variable>,
 }
@@ -85,7 +87,8 @@ impl<'a> IntoIterator for &'a Mapping {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
+#[serde(untagged)]
 pub enum Variable {
     Null,
     Bool(bool),

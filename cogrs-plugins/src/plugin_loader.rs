@@ -98,7 +98,7 @@ impl PluginLoader {
             .with_context(|| format!("Failed to get canonical path for entry in {:?}", base_path))
     }
 
-    pub async fn get_connection_plugin(&self, name: &str) -> Result<Arc<dyn ConnectionPlugin>> {
+    pub async fn get_connection_plugin(&mut self, name: &str) -> Result<Box<dyn ConnectionPlugin>> {
         let plugin_extension = Self::get_plugin_extension();
 
         if let Some(paths) = self.plugin_paths.get(&PluginType::Connection) {
@@ -138,7 +138,7 @@ impl PluginLoader {
         &self,
         path: &Path,
         name: &str,
-    ) -> Result<Option<Arc<dyn ConnectionPlugin>>> {
+    ) -> Result<Option<Box<dyn ConnectionPlugin>>> {
         let lib = Library::new(path).with_context(|| "Failed to load plugin")?;
         let plugin_type_value = self.get_plugin_type(&lib)?;
         match PluginType::from_u64(plugin_type_value) {
@@ -147,7 +147,7 @@ impl PluginLoader {
                 let plugin_name = CStr::from_ptr(plugin_name_fn()).to_str()?;
 
                 if plugin_name.eq(name) {
-                    let create_plugin_fn: Symbol<fn() -> Arc<dyn ConnectionPlugin>> =
+                    let create_plugin_fn: Symbol<fn() -> Box<dyn ConnectionPlugin>> =
                         lib.get(b"create_plugin").with_context(|| {
                             format!("Missing `create_plugin` function in plugin at {:?}", path)
                         })?;
