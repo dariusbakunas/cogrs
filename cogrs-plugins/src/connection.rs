@@ -31,7 +31,6 @@ pub trait ConnectionPlugin: Send + Sync {
         let parsed_params: Value = serde_json::from_str(parameters)
             .context("Failed to parse parameters into JSON value")?;
         validate_input(self.schema(), &parsed_params)
-            .context("Failed to validate connection plugin parameters")
     }
 
     fn schema(&self) -> &'static str;
@@ -39,18 +38,31 @@ pub trait ConnectionPlugin: Send + Sync {
 
 #[macro_export]
 macro_rules! create_connection_plugin {
-    ($plugin_name:ident, $plugin_name_str: expr) => {
-        pub struct $plugin_name;
+    ($plugin_name:ident, $plugin_name_str: expr, { $($field_name:ident: $field_type:ty),* $(,)? }) => {
+        pub struct $plugin_name {
+            $(pub $field_name: $field_type),*
+        }
 
         impl Default for $plugin_name {
             fn default() -> Self {
-                Self {}
+                Self {
+                    $($field_name: Default::default()),*
+                }
+            }
+        }
+
+        impl $plugin_name {
+            pub fn new($($field_name: $field_type),*) -> Self {
+                Self {
+                    $($field_name),*
+                }
             }
         }
 
         #[no_mangle]
         pub fn create_plugin() -> Box<dyn ConnectionPlugin> {
-            Box::new($plugin_name)
+            Box::new($plugin_name::default()
+)
         }
 
         #[no_mangle]

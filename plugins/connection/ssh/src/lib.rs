@@ -19,7 +19,9 @@ define_schema! {
     "#
 }
 
-create_connection_plugin!(Ssh, "ssh");
+create_connection_plugin!(Ssh, "ssh", {
+    remote_addr: String,
+});
 
 impl Ssh {}
 
