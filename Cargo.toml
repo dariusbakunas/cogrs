@@ -9,5 +9,6 @@ members = [
     "cogrs-modules",
     "modules/command",
     "plugins/callback/minimal",
-    "plugins/connection/ssh"
+    "plugins/connection/ssh",
+    "plugins/shell/sh"
 ]

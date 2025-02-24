@@ -20,13 +20,18 @@ impl TaskExecutor {
         &self,
         host: &Host,
         task: &Task,
-        task_vars: IndexMap<String, Variable>,
+        mut task_vars: IndexMap<String, Variable>,
         sender: &mpsc::Sender<WorkerMessage>,
     ) -> Result<TaskResult> {
         debug!(
             "executor run() - task {}, host: {}",
             task.uuid(),
             host.name()
+        );
+
+        task_vars.insert(
+            String::from("host"),
+            Variable::String(host.address().to_string()),
         );
 
         // TODO: handle conditionals

@@ -12,9 +12,10 @@ define_schema! {
         "type": "object",
         "properties": {
             "host": { "type": "string", "description": "Hostname/IP to connect to." }
+            "task_uuid": { "type": "string", "description": "Task UUID." }
         },
         "additionalProperties": true,
-        "required": ["host"]
+        "required": ["host", "task_uuid"]
     }
     "#
 }

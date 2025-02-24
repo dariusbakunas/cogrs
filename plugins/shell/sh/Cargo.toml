@@ -1,0 +1,11 @@
+[package]
+name = "sh"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cogrs-schema = { path = "../../../cogrs-schema" }
+cogrs-plugins = { path = "../../../cogrs-plugins" }
+
+[lib]
+crate-type = ["cdylib"]
