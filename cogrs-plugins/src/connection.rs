@@ -1,3 +1,4 @@
+use crate::shell::ShellPlugin;
 use anyhow::{Context, Result};
 use cogrs_schema::validation::validate_input;
 use serde_json::Value;
@@ -25,7 +26,7 @@ pub trait ConnectionPlugin: Send + Sync {
     fn connect(&self) -> Result<()>;
 
     /// Initializes the plugin with a set of parameters.
-    fn initialize(&mut self, parameters: &str) -> Result<()>;
+    fn initialize(&mut self, shell: Box<dyn ShellPlugin>, parameters: &str) -> Result<()>;
 
     fn validate_parameters(&self, parameters: &str) -> Result<()> {
         let parsed_params: Value = serde_json::from_str(parameters)

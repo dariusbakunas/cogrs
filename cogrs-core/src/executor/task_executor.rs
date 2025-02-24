@@ -44,7 +44,7 @@ impl TaskExecutor {
 
         let mut connection_plugin = loader.get_connection_plugin(task.connection()).await?;
         let parameters = serde_json::to_string(&task_vars)?;
-        connection_plugin.initialize(&parameters)?;
+        //connection_plugin.initialize(&parameters)?;
 
         Ok(result)
     }

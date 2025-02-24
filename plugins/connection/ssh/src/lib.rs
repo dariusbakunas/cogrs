@@ -2,6 +2,7 @@ use anyhow::Result;
 use cogrs_plugins::connection::ConnectionPlugin;
 use cogrs_plugins::create_connection_plugin;
 use cogrs_plugins::plugin_type::PluginType;
+use cogrs_plugins::shell::ShellPlugin;
 use cogrs_schema::define_schema;
 
 define_schema! {
@@ -21,6 +22,7 @@ define_schema! {
 }
 
 create_connection_plugin!(Ssh, "ssh", {
+    shell: Option<Box<dyn ShellPlugin>>,
     remote_addr: String,
 });
 
@@ -55,8 +57,9 @@ impl ConnectionPlugin for Ssh {
         todo!()
     }
 
-    fn initialize(&mut self, parameters: &str) -> Result<()> {
+    fn initialize(&mut self, shell: Box<dyn ShellPlugin>, parameters: &str) -> Result<()> {
         self.validate_parameters(parameters)?;
+        self.shell = Some(shell);
 
         Ok(())
     }

@@ -1,6 +1,7 @@
 use crate::callback::CallbackPlugin;
 use crate::connection::ConnectionPlugin;
 use crate::plugin_type::PluginType;
+use crate::shell::ShellPlugin;
 use anyhow::{bail, Context, Result};
 use libloading::{Library, Symbol};
 use log::warn;
@@ -134,37 +135,72 @@ impl PluginLoader {
         bail!("Connection plugin {} not found", name);
     }
 
+    // Generalized plugin loader implementation
+    unsafe fn load_named_plugin<T, F>(
+        &self,
+        path: &Path,
+        name: &str,
+        expected_plugin_type: PluginType,
+        create_fn_symbol: &[u8],
+        name_fn: F,
+    ) -> Result<Option<Box<T>>>
+    where
+        T: ?Sized,
+        F: FnOnce(&Library) -> Result<Symbol<fn() -> *const c_char>>, // Function to retrieve the `plugin_name` symbol
+    {
+        let lib =
+            Library::new(path).with_context(|| format!("Failed to load plugin at {:?}", path))?;
+        let plugin_type_value = self.get_plugin_type(&lib)?;
+
+        if PluginType::from_u64(plugin_type_value)
+            .is_some_and(|plugin_type| plugin_type == expected_plugin_type)
+        {
+            // Retrieve the plugin name
+            let plugin_name_fn = name_fn(&lib)?;
+            let plugin_name = CStr::from_ptr(plugin_name_fn()).to_str()?;
+
+            if plugin_name.eq(name) {
+                // Retrieve create_plugin function and construct the plugin
+                let create_plugin_fn: Symbol<fn() -> Box<T>> =
+                    lib.get(create_fn_symbol).with_context(|| {
+                        format!("Missing `create_plugin` function in plugin at {:?}", path)
+                    })?;
+                return Ok(Some(create_plugin_fn()));
+            } else {
+                warn!(
+                    "Skipping plugin at {:?}, name {} does not match {}",
+                    path, plugin_name, name
+                );
+            }
+        } else {
+            warn!("Skipping non-{} plugin at {:?}", expected_plugin_type, path);
+        }
+
+        Ok(None)
+    }
+
+    unsafe fn load_shell_plugin(
+        &self,
+        path: &Path,
+        name: &str,
+    ) -> Result<Option<Box<dyn ShellPlugin>>> {
+        self.load_named_plugin(path, name, PluginType::Shell, b"create_plugin", |lib| {
+            lib.get(b"plugin_name").map_err(anyhow::Error::from)
+        })
+    }
+
     unsafe fn load_connection_plugin(
         &self,
         path: &Path,
         name: &str,
     ) -> Result<Option<Box<dyn ConnectionPlugin>>> {
-        let lib = Library::new(path).with_context(|| "Failed to load plugin")?;
-        let plugin_type_value = self.get_plugin_type(&lib)?;
-        match PluginType::from_u64(plugin_type_value) {
-            Some(PluginType::Connection) => {
-                let plugin_name_fn: Symbol<fn() -> *const c_char> = lib.get(b"plugin_name")?;
-                let plugin_name = CStr::from_ptr(plugin_name_fn()).to_str()?;
-
-                if plugin_name.eq(name) {
-                    let create_plugin_fn: Symbol<fn() -> Box<dyn ConnectionPlugin>> =
-                        lib.get(b"create_plugin").with_context(|| {
-                            format!("Missing `create_plugin` function in plugin at {:?}", path)
-                        })?;
-                    return Ok(Some(create_plugin_fn()));
-                } else {
-                    warn!(
-                        "Skipping connection plugin at {:?}, name {} does not match {}",
-                        path, plugin_name, name
-                    );
-                }
-            }
-            _ => {
-                warn!("Skipping non-connection plugin at {:?}", path);
-            }
-        }
-
-        Ok(None)
+        self.load_named_plugin(
+            path,
+            name,
+            PluginType::Connection,
+            b"create_plugin",
+            |lib| lib.get(b"plugin_name").map_err(anyhow::Error::from),
+        )
     }
 
     pub async fn get_callback_plugins(&self) -> Result<Vec<Arc<dyn CallbackPlugin>>> {
