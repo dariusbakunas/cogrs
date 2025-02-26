@@ -69,7 +69,17 @@ builds:
     targets:
       - x86_64-apple-darwin
       - aarch64-apple-darwin
-
+  - builder: rust
+    id: sh-apple
+    binary: libsh.dylib
+    flags:
+      - --release
+      - -p=sh
+    env:
+      - CGO_ENABLED=1
+    targets:
+      - x86_64-apple-darwin
+      - aarch64-apple-darwin
 archives:
   - format: tar.gz
     id: cogrs

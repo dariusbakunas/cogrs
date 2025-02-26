@@ -37,10 +37,14 @@ async fn set_plugin_paths(config_manager: &Mutex<ConfigManager>) -> Result<()> {
         get_plugin_paths(config_manager, "DEFAULT_CALLBACK_PLUGIN_PATH").await?;
     let connection_plugin_paths: Vec<PathBuf> =
         get_plugin_paths(config_manager, "DEFAULT_CONNECTION_PLUGIN_PATH").await?;
+    let shell_plugin_paths: Vec<PathBuf> =
+        get_plugin_paths(config_manager, "DEFAULT_SHELL_PLUGIN_PATH").await?;
 
     plugin_paths.insert(PluginType::Callback, callback_plugin_paths);
     plugin_paths.insert(PluginType::Connection, connection_plugin_paths);
-    loader.set_plugin_paths(plugin_paths);
+    plugin_paths.insert(PluginType::Shell, shell_plugin_paths);
+
+    loader.init(plugin_paths).await?;
 
     Ok(())
 }

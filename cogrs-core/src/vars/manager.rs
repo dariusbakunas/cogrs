@@ -80,7 +80,10 @@ impl VariableManager {
         }
 
         if let Some(task) = task {
-            // TODO: process task
+            all_vars.insert(
+                String::from("task_uuid"),
+                Variable::String(task.uuid().to_string()),
+            );
         }
 
         if let Some(host) = host {

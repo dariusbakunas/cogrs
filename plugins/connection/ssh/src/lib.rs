@@ -12,7 +12,7 @@ define_schema! {
         "title": "SSH Connection Plugin",
         "type": "object",
         "properties": {
-            "host": { "type": "string", "description": "Hostname/IP to connect to." }
+            "host": { "type": "string", "description": "Hostname/IP to connect to." },
             "task_uuid": { "type": "string", "description": "Task UUID." }
         },
         "additionalProperties": true,

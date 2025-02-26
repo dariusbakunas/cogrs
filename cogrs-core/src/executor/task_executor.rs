@@ -42,9 +42,10 @@ impl TaskExecutor {
         let plugin_loader = cogrs_plugins::plugin_loader::PluginLoader::instance();
         let mut loader = plugin_loader.lock().await;
 
+        let shell_plugin = loader.get_shell_plugin("sh").await?;
         let mut connection_plugin = loader.get_connection_plugin(task.connection()).await?;
         let parameters = serde_json::to_string(&task_vars)?;
-        //connection_plugin.initialize(&parameters)?;
+        connection_plugin.initialize(shell_plugin, &parameters)?;
 
         Ok(result)
     }

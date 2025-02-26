@@ -18,6 +18,15 @@ DEFAULT_CALLBACK_PLUGIN_PATH:
     - {key: callback_plugins, section: defaults}
   type: path
   yaml: {key: plugins.callback.path}
+DEFAULT_SHELL_PLUGIN_PATH:
+  name: Shell Plugins Path
+  default: '{{ COGRS_HOME ~ "/plugins/shell:/usr/share/cogrs/plugins/shell" }}'
+  description: Colon-separated paths in which CogRS will search for Shell Plugins.
+  env: [{name: COGRS_SHELL_PLUGINS}]
+  ini:
+    - {key: shell_plugins, section: defaults}
+  type: path
+  yaml: {key: plugins.shell.path}
 DEFAULT_CONNECTION_PLUGIN_PATH:
   name: Connection Plugins Path
   default: '{{ COGRS_HOME ~ "/plugins/connection:/usr/share/cogrs/plugins/connection" }}'

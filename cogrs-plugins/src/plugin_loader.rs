@@ -14,20 +14,89 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 pub struct PluginLoader {
-    plugin_paths: HashMap<PluginType, Vec<PathBuf>>,
-    cached_callback_plugins: Mutex<Option<Vec<Arc<dyn CallbackPlugin>>>>,
+    // plugins that we usually get by type and name
+    named_plugin_paths: HashMap<PluginType, HashMap<String, PathBuf>>,
+    unnamed_plugin_paths: HashMap<PluginType, Vec<PathBuf>>,
 }
 
 impl PluginLoader {
     fn new() -> Self {
         PluginLoader {
-            cached_callback_plugins: Mutex::new(None),
-            plugin_paths: HashMap::new(),
+            named_plugin_paths: HashMap::new(),
+            unnamed_plugin_paths: HashMap::new(),
         }
     }
 
-    pub fn set_plugin_paths(&mut self, plugin_paths: HashMap<PluginType, Vec<PathBuf>>) {
-        self.plugin_paths = plugin_paths;
+    pub async fn init(&mut self, plugin_paths: HashMap<PluginType, Vec<PathBuf>>) -> Result<()> {
+        let plugin_extension = Self::get_plugin_extension();
+
+        for (plugin_type, paths) in plugin_paths {
+            for path in paths {
+                let entries = match self.read_plugin_directory(&path).await {
+                    Ok(entries) => entries,
+                    Err(e) => {
+                        warn!("Failed to read plugin directory {:?}: {}", path, e);
+                        continue;
+                    }
+                };
+
+                for entry in entries {
+                    let plugin_path = match self.get_plugin_path(&entry, &path).await {
+                        Ok(path) => path,
+                        Err(e) => {
+                            warn!("Skipping invalid directory entry in {:?}: {}", &path, e);
+                            continue;
+                        }
+                    };
+
+                    if self.is_valid_plugin_file(&plugin_path, &plugin_extension) {
+                        // TODO: we need to get actual plugin type here
+                        let actual_plugin_type = unsafe {
+                            let lib = Library::new(plugin_path.to_path_buf())
+                                .with_context(|| "Failed to load plugin")?;
+                            self.get_plugin_type(&lib)?
+                        };
+
+                        let actual_plugin_type = PluginType::from_u64(actual_plugin_type);
+
+                        if let Some(actual_plugin_type) = actual_plugin_type {
+                            if actual_plugin_type != plugin_type {
+                                warn!(
+                                    "Skipping {} plugin at {:?} (wrong type, expected {})",
+                                    actual_plugin_type, &plugin_path, plugin_type
+                                );
+                                continue;
+                            }
+
+                            match actual_plugin_type {
+                                PluginType::Callback => {
+                                    self.unnamed_plugin_paths
+                                        .entry(PluginType::Callback)
+                                        .and_modify(|paths| paths.push(plugin_path.to_path_buf()))
+                                        .or_insert_with(|| vec![plugin_path]);
+                                }
+                                PluginType::Connection | PluginType::Shell => {
+                                    let plugin_name =
+                                        unsafe { self.get_plugin_name(&plugin_path)? };
+                                    self.named_plugin_paths
+                                        .entry(actual_plugin_type.clone())
+                                        .or_insert_with(HashMap::new)
+                                        .insert(plugin_name, plugin_path.to_path_buf());
+                                }
+                                _ => {
+                                    warn!(
+                                        "Skipping {} plugin at {:?} (not implemented)",
+                                        plugin_type, &plugin_path
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Determines the platform-specific plugin file extension
@@ -72,7 +141,6 @@ impl PluginLoader {
     /// Loads an individual plugin from a file path.
     unsafe fn load_callback_plugin(&self, path: &Path) -> Result<Option<Arc<dyn CallbackPlugin>>> {
         let lib = Library::new(path).with_context(|| "Failed to load plugin")?;
-
         let plugin_type_value = self.get_plugin_type(&lib)?;
         match PluginType::from_u64(plugin_type_value) {
             Some(PluginType::Callback) => {
@@ -99,40 +167,50 @@ impl PluginLoader {
             .with_context(|| format!("Failed to get canonical path for entry in {:?}", base_path))
     }
 
-    pub async fn get_connection_plugin(&mut self, name: &str) -> Result<Box<dyn ConnectionPlugin>> {
-        let plugin_extension = Self::get_plugin_extension();
+    pub async fn get_named_plugin<T>(
+        &mut self,
+        plugin_type: PluginType,
+        name: &str,
+        load_plugin_fn: unsafe fn(&PluginLoader, &Path, &str) -> Result<Option<Box<T>>>,
+    ) -> Result<Box<T>>
+    where
+        T: ?Sized,
+    {
+        let plugin_path = self
+            .named_plugin_paths
+            .get(&plugin_type)
+            .and_then(|paths| paths.get(name).map(|path| path.to_path_buf()));
 
-        if let Some(paths) = self.plugin_paths.get(&PluginType::Connection) {
-            for path in paths {
-                let entries = match self.read_plugin_directory(path).await {
-                    Ok(entries) => entries,
-                    Err(e) => {
-                        warn!("Failed to read plugin directory {:?}: {}", path, e);
-                        continue;
-                    }
-                };
-
-                for entry in entries {
-                    let plugin_path = match self.get_plugin_path(&entry, path).await {
-                        Ok(path) => path,
-                        Err(e) => {
-                            warn!("Skipping invalid directory entry in {:?}: {}", path, e);
-                            continue;
-                        }
-                    };
-
-                    if self.is_valid_plugin_file(&plugin_path, &plugin_extension) {
-                        if let Some(plugin) =
-                            unsafe { self.load_connection_plugin(&plugin_path, name)? }
-                        {
-                            return Ok(plugin);
-                        }
-                    }
-                }
+        if let Some(path) = plugin_path {
+            if let Some(plugin) = unsafe { load_plugin_fn(self, &path, name)? } {
+                return Ok(plugin);
             }
         }
 
-        bail!("Connection plugin {} not found", name);
+        bail!("{} plugin {} not found", plugin_type, name);
+    }
+
+    pub async fn get_connection_plugin(&mut self, name: &str) -> Result<Box<dyn ConnectionPlugin>> {
+        self.get_named_plugin(
+            PluginType::Connection,
+            name,
+            PluginLoader::load_connection_plugin,
+        )
+        .await
+    }
+
+    pub async fn get_shell_plugin(&mut self, name: &str) -> Result<Box<dyn ShellPlugin>> {
+        self.get_named_plugin(PluginType::Shell, name, PluginLoader::load_shell_plugin)
+            .await
+    }
+
+    unsafe fn get_plugin_name(&self, path: &PathBuf) -> Result<String> {
+        let lib =
+            Library::new(path).with_context(|| format!("Failed to load plugin at {:?}", path))?;
+        let plugin_name_fn: Symbol<unsafe extern "C" fn() -> *const c_char> = lib
+            .get(b"plugin_name")
+            .with_context(|| "Failed to retrieve `plugin_name` function")?;
+        Ok(CStr::from_ptr(plugin_name_fn()).to_str()?.to_string())
     }
 
     // Generalized plugin loader implementation
@@ -204,37 +282,12 @@ impl PluginLoader {
     }
 
     pub async fn get_callback_plugins(&self) -> Result<Vec<Arc<dyn CallbackPlugin>>> {
-        if let Some(cached) = self.get_cached_callback_plugins().await {
-            return Ok(cached);
-        }
-
         let mut plugins: Vec<Arc<dyn CallbackPlugin>> = Vec::new();
-        let plugin_extension = Self::get_plugin_extension();
 
-        if let Some(paths) = self.plugin_paths.get(&PluginType::Callback) {
-            for path in paths {
-                let entries = match self.read_plugin_directory(path).await {
-                    Ok(entries) => entries,
-                    Err(e) => {
-                        warn!("Failed to read plugin directory {:?}: {}", path, e);
-                        continue;
-                    }
-                };
-
-                for entry in entries {
-                    let plugin_path = match self.get_plugin_path(&entry, path).await {
-                        Ok(path) => path,
-                        Err(e) => {
-                            warn!("Skipping invalid directory entry in {:?}: {}", path, e);
-                            continue;
-                        }
-                    };
-                    if self.is_valid_plugin_file(&plugin_path, &plugin_extension) {
-                        // Load the plugin and register it if valid
-                        if let Some(plugin) = unsafe { self.load_callback_plugin(&plugin_path) }? {
-                            plugins.push(plugin);
-                        }
-                    }
+        if let Some(paths) = self.unnamed_plugin_paths.get(&PluginType::Callback) {
+            for plugin_path in paths {
+                if let Some(plugin) = unsafe { self.load_callback_plugin(&plugin_path) }? {
+                    plugins.push(plugin);
                 }
             }
         } else {
@@ -242,21 +295,7 @@ impl PluginLoader {
             return Ok(plugins);
         }
 
-        self.cache_callback_plugins(plugins.clone()).await;
-
         Ok(plugins)
-    }
-
-    /// Retrieves the cached plugins if available.
-    async fn get_cached_callback_plugins(&self) -> Option<Vec<Arc<dyn CallbackPlugin>>> {
-        let cache = self.cached_callback_plugins.lock().await;
-        cache.as_ref().cloned()
-    }
-
-    /// Caches the provided plugins.
-    async fn cache_callback_plugins(&self, plugins: Vec<Arc<dyn CallbackPlugin>>) {
-        let mut cache = self.cached_callback_plugins.lock().await;
-        *cache = Some(plugins);
     }
 }
 
