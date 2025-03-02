@@ -1,6 +1,3 @@
-use crate::inventory::host::Host;
-use crate::playbook::task::Task;
-
 pub struct TaskResult {
     host_name: String,
     task_uuid: String,

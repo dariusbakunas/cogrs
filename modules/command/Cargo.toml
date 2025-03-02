@@ -9,3 +9,4 @@ cogrs-schema = { path = "../../cogrs-schema" }
 cogrs-modules = { path = "../../cogrs-modules" }
 serde_json = "1.0.138"
 anyhow = "1.0.95"
+serde = { version = "1.0.217", features = ["derive"] }

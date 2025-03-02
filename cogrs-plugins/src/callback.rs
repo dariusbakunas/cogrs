@@ -25,7 +25,9 @@ pub trait CallbackPlugin: Send + Sync {
 #[macro_export]
 macro_rules! create_callback_plugin {
     // Macro expects the plugin name, events it handles, and methods to implement
-    ($plugin_name:ident, $plugin_name_str: expr, [$($event:expr),*], $handler:expr) => {
+    ($plugin_name:ident, $plugin_name_str: expr, $versions:expr, [$($event:expr),*], $handler:expr) => {
+        use serde_json::json;
+
         pub struct $plugin_name;
 
         impl CallbackPlugin for $plugin_name {
@@ -57,6 +59,14 @@ macro_rules! create_callback_plugin {
         pub extern "C" fn plugin_name() -> *const u8 {
             $plugin_name_str.as_ptr()
         }
+
+        #[no_mangle]
+        pub extern "C" fn cogrs_versions() -> *const std::os::raw::c_char {
+            let versions = serde_json::to_string(&$versions)
+            .unwrap();
+
+            std::ffi::CString::new(versions).unwrap().into_raw()
+        }
     };
 }
 
@@ -65,6 +75,7 @@ mod tests {
     use super::*;
     use crate::plugin_type::PluginType;
     use serde_json::json;
+    use std::collections::HashMap;
 
     #[test]
     fn test_get_interested_events() {
@@ -128,6 +139,7 @@ mod tests {
         create_callback_plugin!(
             TestPlugin,
             "test_plugin",
+            HashMap::from([("cogrs-plugin", "1.2.3"),]),
             [EventType::RunnerOnOk],
             custom_handler
         );

@@ -1,10 +1,17 @@
 use anyhow::Result;
-use clap::Parser;
 use cogrs_modules::define_module;
 use cogrs_modules::framework::Module;
 use cogrs_schema::define_schema;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+#[derive(Debug, Deserialize, Serialize, Default)]
+struct Parameters {
+    cmd: String,
+}
 
 define_schema! {
+    Parameters,
     r#"
     {
         "$schema": "http://json-schema.org/draft-07/schema#",
@@ -26,8 +33,9 @@ impl Module for CommandModule {
         SCHEMA
     }
 
-    fn run(inputs: serde_json::value::Value) -> Result<()> {
-        let cmd = inputs["cmd"].as_str().unwrap();
+    fn run(inputs: Value) -> Result<()> {
+        let parameters: Parameters = serde_json::from_value(inputs)?;
+        let cmd = parameters.cmd.clone();
         println!("Running command: {}", cmd);
 
         Ok(())

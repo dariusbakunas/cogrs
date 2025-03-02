@@ -1,5 +1,5 @@
 [workspace]
-edition = "2021"
+resolver = "2"
 
 members = [
     "cogrs",
@@ -9,6 +9,8 @@ members = [
     "cogrs-modules",
     "modules/command",
     "plugins/callback/minimal",
-    "plugins/connection/ssh",
-    "plugins/shell/sh"
+    "plugins/connection/ssh-lib",
+    "plugins/connection/ssh-dylib",
+    "plugins/shell/sh-lib",
+    "plugins/shell/sh-dylib",
 ]

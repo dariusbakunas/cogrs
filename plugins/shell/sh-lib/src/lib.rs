@@ -1,21 +1,21 @@
+use anyhow::Result;
 use cogrs_plugins::create_shell_plugin;
-use cogrs_plugins::plugin_type::PluginType;
 use cogrs_plugins::shell::ShellPlugin;
 
-create_shell_plugin!(Sh, "sh", {
+create_shell_plugin!(Sh, {
    compatible_shells: Vec<String>,
 });
 
 impl ShellPlugin for Sh {
+    fn shell_and(&self) -> String {
+        String::from("&&")
+    }
+
     fn quote(&self, value: &str) -> String {
         format!("'{}'", value)
     }
 
     fn pwd(&self) -> String {
-        todo!()
-    }
-
-    fn expand_user(&self, home_path: &str, username: &str) -> String {
         todo!()
     }
 

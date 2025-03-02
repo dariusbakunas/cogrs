@@ -15,6 +15,7 @@ macro_rules! define_module {
     ($module_type:ty) => {
         fn main() -> Result<()> {
             use anyhow::{anyhow, Result};
+            use clap::Parser;
             use cogrs_schema::validation::validate_input;
             use serde_json::Value;
             use $crate::cli::ModuleArgs;

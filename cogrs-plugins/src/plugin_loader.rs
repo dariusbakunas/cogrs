@@ -6,6 +6,8 @@ use anyhow::{bail, Context, Result};
 use libloading::{Library, Symbol};
 use log::warn;
 use once_cell::sync::Lazy;
+use semver::{Version, VersionReq};
+use serde_json::Value;
 use std::collections::HashMap;
 use std::ffi::{c_char, CStr};
 use std::fs;
@@ -50,10 +52,10 @@ impl PluginLoader {
                     };
 
                     if self.is_valid_plugin_file(&plugin_path, &plugin_extension) {
-                        // TODO: we need to get actual plugin type here
                         let actual_plugin_type = unsafe {
                             let lib = Library::new(plugin_path.to_path_buf())
                                 .with_context(|| "Failed to load plugin")?;
+
                             self.get_plugin_type(&lib)?
                         };
 
@@ -67,6 +69,24 @@ impl PluginLoader {
                                 );
                                 continue;
                             }
+
+                            // verify plugin versions
+                            let plugin_versions = unsafe {
+                                let lib = Library::new(plugin_path.to_path_buf())
+                                    .with_context(|| "Failed to load plugin")?;
+                                self.get_plugin_versions(&lib)?
+                            };
+
+                            let version_constraints = Self::get_version_constraints();
+
+                            // Verify versions
+                            Self::verify_plugin_versions(plugin_versions, version_constraints)
+                                .with_context(|| {
+                                    format!(
+                                        "Plugin at {:?} contains incompatible library versions",
+                                        plugin_path
+                                    )
+                                })?;
 
                             match actual_plugin_type {
                                 PluginType::Callback => {
@@ -108,6 +128,65 @@ impl PluginLoader {
         } else {
             "so"
         }
+    }
+
+    fn get_version_constraints() -> HashMap<String, VersionReq> {
+        HashMap::from([
+            (
+                "cogrs-plugin".to_string(),
+                VersionReq::parse("^1.2").unwrap(),
+            ),
+            (
+                "cogrs-schema".to_string(),
+                VersionReq::parse("^2.0").unwrap(),
+            ),
+        ])
+    }
+
+    unsafe fn get_plugin_versions(&self, lib: &Library) -> Result<HashMap<String, Version>> {
+        let versions_fn: Symbol<unsafe extern "C" fn() -> *const c_char> = lib
+            .get(b"cogrs_versions")
+            .with_context(|| "Failed to retrieve `cogrs_versions` function")?;
+
+        let versions_cstr = CStr::from_ptr(versions_fn());
+        let versions_json: HashMap<String, String> = serde_json::from_str(versions_cstr.to_str()?)
+            .with_context(|| {
+                "Failed to parse `cogrs_versions` output as a `HashMap<String, String>`"
+            })?;
+
+        // Parse each version string into a `semver::Version`
+        versions_json
+            .into_iter()
+            .map(|(key, value)| {
+                Version::parse(&value)
+                    .map(|version| (key.clone(), version))
+                    .map_err(|err| anyhow::anyhow!("Failed to parse version for {}: {}", key, err))
+            })
+            .collect()
+    }
+
+    fn verify_plugin_versions(
+        plugin_versions: HashMap<String, Version>,
+        version_constraints: HashMap<String, VersionReq>,
+    ) -> Result<()> {
+        for (lib, plugin_version) in plugin_versions {
+            if let Some(constraint) = version_constraints.get(&lib) {
+                if !constraint.matches(&plugin_version) {
+                    bail!(
+                        "Incompatible version for library `{}`: expected {}, found {}",
+                        lib,
+                        constraint,
+                        plugin_version
+                    );
+                }
+            } else {
+                warn!(
+                    "Plugin declares unexpected library `{}` with version {}",
+                    lib, plugin_version
+                );
+            }
+        }
+        Ok(())
     }
 
     /// Attempts to retrieve the plugin type

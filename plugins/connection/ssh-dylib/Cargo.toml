@@ -1,11 +1,12 @@
 [package]
-name = "sh"
+name = "ssh-dylib"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-cogrs-schema = { path = "../../../cogrs-schema" }
 cogrs-plugins = { path = "../../../cogrs-plugins" }
+ssh-lib = { path = "../ssh-lib" }
+serde_json = "1.0.138"
 
 [lib]
 crate-type = ["cdylib"]

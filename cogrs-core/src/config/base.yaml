@@ -36,3 +36,11 @@ DEFAULT_CONNECTION_PLUGIN_PATH:
     - {key: connection_plugins, section: defaults}
   type: path
   yaml: {key: plugins.connection.path}
+DEFAULT_LOCAL_TMP:
+  name: Controller temporary directory
+  default: '{{ COGRS_HOME ~ "/tmp" }}'
+  description: Temporary directory for CogRS to use on the controller.
+  env: [{name: COGRS_LOCAL_TEMP}]
+  ini:
+    - {key: local_tmp, section: defaults}
+  type: path
